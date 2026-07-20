@@ -24,6 +24,8 @@ public class GlobalExceptionHandler {
     ResponseEntity<ApiError> handleUnauthorized(UnauthorizedException exception) { return error(HttpStatus.UNAUTHORIZED, exception.getMessage(), "UNAUTHORIZED"); }
     @ExceptionHandler(AccountLockedException.class)
     ResponseEntity<ApiError> handleAccountLocked(AccountLockedException exception) { return error(HttpStatus.LOCKED, exception.getMessage(), "ACCOUNT_LOCKED"); }
+    @ExceptionHandler(ForbiddenException.class)
+    ResponseEntity<ApiError> handleForbidden(ForbiddenException exception) { return error(HttpStatus.FORBIDDEN, exception.getMessage(), "FORBIDDEN"); }
     @ExceptionHandler(ValidationException.class)
     ResponseEntity<ApiError> handleValidation(ValidationException exception) { return error(HttpStatus.BAD_REQUEST, exception.getMessage(), "VALIDATION_ERROR"); }
     @ExceptionHandler(MethodArgumentNotValidException.class)
