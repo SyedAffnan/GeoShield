@@ -1,0 +1,53 @@
+spring:
+  application:
+    name: geoshield-backend
+  datasource:
+    url: jdbc:mysql://localhost:3306/geoshield?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+        jdbc:
+          time_zone: UTC
+  jackson:
+    time-zone: UTC
+
+server:
+  forward-headers-strategy: framework
+  error:
+    include-message: never
+
+geoshield:
+  security:
+    bcrypt-strength: ${GEOSHIELD_BCRYPT_STRENGTH:12}
+  jwt:
+    secret: ${GEOSHIELD_JWT_SECRET}
+    access-token-ttl: ${GEOSHIELD_JWT_ACCESS_TOKEN_TTL:PT15M}
+    refresh-token-ttl: ${GEOSHIELD_JWT_REFRESH_TOKEN_TTL:P30D}
+  risk:
+    historical-incident-weight: ${GEOSHIELD_RISK_HISTORICAL_INCIDENT_WEIGHT:0.30}
+    weather-weight: ${GEOSHIELD_RISK_WEATHER_WEIGHT:0.20}
+    time-of-day-weight: ${GEOSHIELD_RISK_TIME_OF_DAY_WEIGHT:0.15}
+    service-proximity-weight: ${GEOSHIELD_RISK_SERVICE_PROXIMITY_WEIGHT:0.15}
+    user-report-weight: ${GEOSHIELD_RISK_USER_REPORT_WEIGHT:0.10}
+    connectivity-weight: ${GEOSHIELD_RISK_CONNECTIVITY_WEIGHT:0.05}
+    other-context-weight: ${GEOSHIELD_RISK_OTHER_CONTEXT_WEIGHT:0.05}
+    low-max: ${GEOSHIELD_RISK_LOW_MAX:39}
+    medium-max: ${GEOSHIELD_RISK_MEDIUM_MAX:59}
+    high-max: ${GEOSHIELD_RISK_HIGH_MAX:79}
+    # TODO(architecture-open): configure the approved weather provider when selected.
+
+logging:
+  structured:
+    format:
+      console: logstash
+  level:
+    root: INFO

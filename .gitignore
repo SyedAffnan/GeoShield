@@ -1,0 +1,17 @@
+# Backend
+backend/target/
+backend/.mvn/
+
+# Flutter / Dart
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/.packages
+mobile/build/
+
+# IDE and environment files
+.idea/
+.vscode/
+.env
+.env.*
+!*.example
