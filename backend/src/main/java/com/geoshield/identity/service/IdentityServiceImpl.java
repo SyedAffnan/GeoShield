@@ -74,6 +74,12 @@ public class IdentityServiceImpl implements IdentityService {
                 jwtTokenService.accessTokenExpiresInSeconds(), user.getRole().getName());
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public User getUserById(java.util.UUID userId) {
+        return userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    }
+
     private String createRefreshToken() {
         byte[] tokenBytes = new byte[32];
         SECURE_RANDOM.nextBytes(tokenBytes);

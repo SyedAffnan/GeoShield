@@ -29,7 +29,7 @@ geoshield:
   security:
     bcrypt-strength: ${GEOSHIELD_BCRYPT_STRENGTH:12}
   jwt:
-    secret: ${GEOSHIELD_JWT_SECRET}
+    secret: GeoShieldJwtSecretKey2026ForProjectReview123456789
     access-token-ttl: ${GEOSHIELD_JWT_ACCESS_TOKEN_TTL:PT15M}
     refresh-token-ttl: ${GEOSHIELD_JWT_REFRESH_TOKEN_TTL:P30D}
   risk:
