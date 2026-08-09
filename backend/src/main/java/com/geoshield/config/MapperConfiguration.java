@@ -3,6 +3,7 @@ package com.geoshield.config;
 import com.geoshield.identity.mapper.EmergencyContactMapper;
 import com.geoshield.identity.mapper.ProfileMapper;
 import com.geoshield.identity.mapper.UserMapper;
+import com.geoshield.incident.mapper.IncidentMapper;
 import com.geoshield.location.mapper.LocationMapper;
 import org.mapstruct.factory.Mappers;
 import org.springframework.context.annotation.Bean;
@@ -28,5 +29,10 @@ public class MapperConfiguration {
     @Bean
     LocationMapper locationMapper() {
         return Mappers.getMapper(LocationMapper.class);
+    }
+
+    @Bean
+    IncidentMapper incidentMapper() {
+        return Mappers.getMapper(IncidentMapper.class);
     }
 }
