@@ -2,7 +2,7 @@
 
 GeoShield is an AI-powered tourist safety and emergency-response system.
 
-This repository contains the approved project skeleton only. Business logic is intentionally not implemented.
+This repository contains the Spring Boot backend and Flutter client project structure.
 
 ## Projects
 
@@ -11,7 +11,17 @@ This repository contains the approved project skeleton only. Business logic is i
 
 ## Backend modules
 
-`identity`, `location`, `risk`, `sos`, `incident`, `notification`, `emergencyservices`, and `admin` are the only backend module boundaries. Modules communicate through service interfaces.
+`identity`, `location`, `historicaldata`, `risk`, `sos`, `incident`, `notification`, `emergencyservices`, and `admin` are the backend module boundaries. Modules communicate through service interfaces.
+
+## Implementation status
+
+- Implemented: Identity/Auth, Tourist Profile, Emergency Contacts, Device Tokens, and Location.
+- Implemented: Historical Data Processing and `HistoricalSafetyRecords` persistence. The batch pipeline normalizes the approved MoRTH Road Accidents in India 2024 Annexure-4 CSV and NCRB Crime in India 2023 Table 13A.2 CSV into one aggregate-statistics table.
+- Not implemented: Incident, Risk Engine/Risk API, Random Forest training, SOS, Notifications, Emergency Services, Offline Sync, and Geofencing.
+
+Historical ingestion is opt-in and has no public CRUD endpoint. Set `GEOSHIELD_HISTORICAL_INGESTION_ENABLED=true` and provide both source paths through `GEOSHIELD_HISTORICAL_MORTH_SOURCE` and `GEOSHIELD_HISTORICAL_NCRB_SOURCE`. A verified local import processed 220 MoRTH records and 66 NCRB records; repeating the same source files is idempotent.
+
+`HistoricalSafetyRecords` holds aggregate government statistics only. It does not contain individual incidents, GPS coordinates, exact timestamps, or tourist identities.
 
 ## Configuration
 

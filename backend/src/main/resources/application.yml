@@ -44,6 +44,11 @@ geoshield:
     medium-max: ${GEOSHIELD_RISK_MEDIUM_MAX:59}
     high-max: ${GEOSHIELD_RISK_HIGH_MAX:79}
     # TODO(architecture-open): configure the approved weather provider when selected.
+  historical-data:
+    ingestion:
+      enabled: ${GEOSHIELD_HISTORICAL_INGESTION_ENABLED:false}
+      morth-source: ${GEOSHIELD_HISTORICAL_MORTH_SOURCE:}
+      ncrb-source: ${GEOSHIELD_HISTORICAL_NCRB_SOURCE:}
 
 logging:
   structured:
