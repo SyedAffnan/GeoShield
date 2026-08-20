@@ -18,8 +18,9 @@ This repository contains the Spring Boot backend and Flutter client project stru
 - Implemented: Identity/Auth, Tourist Profile, Emergency Contacts, Device Tokens, and Location.
 - Implemented: Historical Data Processing and `HistoricalSafetyRecords` persistence. The batch pipeline normalizes the approved MoRTH Road Accidents in India 2024 Annexure-4 CSV and NCRB Crime in India 2023 Table 13A.2 CSV into one aggregate-statistics table.
 - IMPLEMENTED AND VERIFIED: Incident reporting, authenticated owner-scoped incident reads, request idempotency, and SHA-256 integrity verification.
-- IMPLEMENTED: Baseline Contextual Risk Engine — deterministic weighted scoring, explainability, safety recommendations, and `RiskScores` audit persistence. It has no public Risk API and does not synthesize unavailable contextual data.
-- Not implemented: Risk API, Random Forest training, AI/ML training, Contextual Risk Fusion, SOS, Notifications, Emergency Services, Offline Sync, and Geofencing.
+- IMPLEMENTED: Baseline Contextual Risk Engine — deterministic weighted scoring, explainability, safety recommendations, and `RiskScores` audit persistence. It does not synthesize unavailable contextual data.
+- IMPLEMENTED AND VERIFIED: Risk API — `GET /api/v1/risk` returns the authenticated tourist's current baseline risk using their stored current location.
+- Not implemented: Random Forest training, AI/ML training, Contextual Risk Fusion, SOS, Notifications, Emergency Services, Offline Sync, and Geofencing.
 
 Historical ingestion is opt-in and has no public CRUD endpoint. Set `GEOSHIELD_HISTORICAL_INGESTION_ENABLED=true` and provide both source paths through `GEOSHIELD_HISTORICAL_MORTH_SOURCE` and `GEOSHIELD_HISTORICAL_NCRB_SOURCE`. A verified local import processed 220 MoRTH records and 66 NCRB records; repeating the same source files is idempotent.
 

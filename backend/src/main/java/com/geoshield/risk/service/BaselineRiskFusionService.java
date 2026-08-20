@@ -61,7 +61,7 @@ public class BaselineRiskFusionService implements RiskFusionService {
     private RiskFactorContribution contribution(RiskFactorType factor, RiskFactorInput input, BigDecimal weight) {
         if (!input.available()) {
             return new RiskFactorContribution(factor, false, null, weight, BigDecimal.ZERO,
-                    factorLabel(factor) + " is unavailable and contributes no fabricated risk value.");
+                    factorLabel(factor) + " is unavailable: " + input.unavailabilityReason());
         }
         BigDecimal contribution = input.normalizedRisk().multiply(weight);
         return new RiskFactorContribution(factor, true, input.normalizedRisk(), weight, contribution,

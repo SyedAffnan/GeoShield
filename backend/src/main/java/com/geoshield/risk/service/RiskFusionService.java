@@ -6,7 +6,7 @@ import com.geoshield.risk.dto.BaselineRiskResult;
 public interface RiskFusionService extends ModuleService {
     BaselineRiskResult calculateBaselineRisk(BaselineRiskCalculationRequest request);
 
-    // TODO(architecture-open): add the approved public Risk API contract once its response is finalized.
+    // TODO(architecture-open): finalize the AI/ML-specific Risk API response contract and endpoint compatibility.
     // TODO(architecture-open): add geographic normalization before resolving GPS coordinates to historical data.
     // TODO(architecture-open): define evidence-based normalization rules for raw contextual source data.
     // TODO(architecture-open): add a validated AI/ML strategy behind this interface after model training is approved.

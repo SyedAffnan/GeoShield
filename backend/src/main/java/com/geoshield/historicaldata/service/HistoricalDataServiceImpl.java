@@ -3,6 +3,7 @@ package com.geoshield.historicaldata.service;
 import com.geoshield.common.exception.ValidationException;
 import com.geoshield.historicaldata.dto.HistoricalDataImportResult;
 import com.geoshield.historicaldata.entity.HistoricalSafetyRecord;
+import com.geoshield.historicaldata.entity.HistoricalSourceType;
 import com.geoshield.historicaldata.ingestion.HistoricalDataImporter;
 import com.geoshield.historicaldata.ingestion.HistoricalDataset;
 import com.geoshield.historicaldata.ingestion.HistoricalSafetyRecordDraft;
@@ -26,6 +27,12 @@ public class HistoricalDataServiceImpl implements HistoricalDataService {
         this.validator = validator;
         this.importers = new EnumMap<>(HistoricalDataset.class);
         importers.forEach(importer -> this.importers.put(importer.dataset(), importer));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean hasHistoricalSafetyRecords() {
+        return repository.existsBySourceType(HistoricalSourceType.HISTORICAL);
     }
 
     @Override
