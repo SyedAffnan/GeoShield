@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface HistoricalSafetyRecordRepository extends JpaRepository<HistoricalSafetyRecord, Long> {
     boolean existsBySourceType(HistoricalSourceType sourceType);
+    java.util.List<HistoricalSafetyRecord> findAllByGeographicLevel(GeographicLevel geographicLevel);
 
     Optional<HistoricalSafetyRecord> findBySourceAndSourceYearAndGeographicLevelAndGeographicUnitAndCategoryAndMetricName(
             String source, int sourceYear, GeographicLevel geographicLevel, String geographicUnit, String category,

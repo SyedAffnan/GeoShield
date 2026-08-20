@@ -2,8 +2,10 @@ package com.geoshield.historicaldata.service;
 
 import com.geoshield.common.exception.ValidationException;
 import com.geoshield.historicaldata.dto.HistoricalDataImportResult;
+import com.geoshield.historicaldata.dto.HistoricalSafetyRecordSummary;
 import com.geoshield.historicaldata.entity.HistoricalSafetyRecord;
 import com.geoshield.historicaldata.entity.HistoricalSourceType;
+import com.geoshield.historicaldata.entity.GeographicLevel;
 import com.geoshield.historicaldata.ingestion.HistoricalDataImporter;
 import com.geoshield.historicaldata.ingestion.HistoricalDataset;
 import com.geoshield.historicaldata.ingestion.HistoricalSafetyRecordDraft;
@@ -33,6 +35,14 @@ public class HistoricalDataServiceImpl implements HistoricalDataService {
     @Transactional(readOnly = true)
     public boolean hasHistoricalSafetyRecords() {
         return repository.existsBySourceType(HistoricalSourceType.HISTORICAL);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<HistoricalSafetyRecordSummary> getHistoricalSafetyRecords(GeographicLevel geographicLevel) {
+        return repository.findAllByGeographicLevel(geographicLevel).stream().map(record -> new HistoricalSafetyRecordSummary(
+                record.getSource(), record.getSourceYear(), record.getGeographicLevel(), record.getGeographicUnit(),
+                record.getCategory(), record.getMetricName(), record.getMetricValue(), record.isTouristSpecific())).toList();
     }
 
     @Override
