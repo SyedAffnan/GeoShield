@@ -1,0 +1,9 @@
+# Invalid on purpose: "Rainy" accidents mistyped as 35,824 instead of the published 35,284,
+# so the column no longer sums to Table 3.8's own printed Total of 4,87,707.
+# Used to prove the reconciliation guard catches a transcription slip.
+category,accidents_2024,killed_2024
+Sunny / clear,372387,128513
+Rainy,35824,12665
+Foggy & misty,33955,15115
+Hail / sleet,4310,1919
+Others,41771,18963

@@ -1,0 +1,8 @@
+# Invalid on purpose: "Hail / sleet" reports more persons killed than accidents, which would make
+# the killed-per-accident severity exceed 1 and break the normalization's meaning.
+category,accidents_2024,killed_2024
+Sunny / clear,372387,128513
+Rainy,35284,12665
+Foggy & misty,33955,15115
+Hail / sleet,1919,4310
+Others,41771,18963

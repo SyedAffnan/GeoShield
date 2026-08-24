@@ -1,0 +1,42 @@
+# MoRTH weather-condition accident severity reference for the GeoShield weather risk factor.
+#
+# Source        : Ministry of Road Transport & Highways (MoRTH), Transport Research Wing,
+#                 "Road Accidents in India 2024".
+# Table         : Table 3.8, "Road accidents, persons killed and persons injured by weather
+#                 condition during 2023 and 2024" - the 2024 columns only.
+# Located at    : printed page 50 (physical PDF page 83); the page footer reads "50".
+# Source year   : 2024.
+# Scope         : national aggregate for India. NOT State/UT-specific and NOT tourist-specific.
+#
+# Transcribed verbatim. Only two published columns are recorded here, because only these two
+# feed the risk mapping: number of accidents and persons killed. Table 3.8 also publishes
+# persons injured and the full 2023 columns; they are deliberately omitted rather than
+# combined into the feature.
+#
+# Cross-checks asserted by the test suite:
+#   - the five accident counts sum to the published Total of 4,87,707
+#   - the five killed counts sum to the published Total of 1,77,175
+#   - Chart 3.5 on the same page restates the 2024 percentage shares (accidents
+#     76.4 / 7.2 / 7.0 / 0.9 / 8.6 and killed 72.5 / 7.1 / 8.5 / 1.1 / 10.7), each of which is
+#     reproducible from the counts below.
+#
+# IMPORTANT - why the accident count is NOT the risk signal:
+#   The accident column measures EXPOSURE, not danger. "Sunny / clear" holds the largest share
+#   (76.4%) simply because most travel happens in clear weather. Normalizing that share
+#   directly would rank clear weather as the most dangerous condition, which the source does
+#   not support. The derived severity below (persons killed per 100 accidents) instead
+#   conditions on an accident having already occurred, so the unpublished exposure denominator
+#   cancels out of the ratio. MoRTH does NOT publish any 0-100 weather risk score; the
+#   normalized column is computed by GeoShield and is documented as architecture-open.
+#
+# "Others" is an unclassified residual bucket whose composition MoRTH does not publish. It is
+# retained here for full fidelity to Table 3.8 and stays in the normalization denominator, but
+# no WMO weather code is ever mapped onto it, because no observed condition can be justifiably
+# asserted to belong to an unknown-composition bucket.
+#
+category,accidents_2024,killed_2024
+Sunny / clear,372387,128513
+Rainy,35284,12665
+Foggy & misty,33955,15115
+Hail / sleet,4310,1919
+Others,41771,18963

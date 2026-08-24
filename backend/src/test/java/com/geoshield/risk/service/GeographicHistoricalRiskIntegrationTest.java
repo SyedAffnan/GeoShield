@@ -26,6 +26,10 @@ import com.geoshield.risk.entity.RiskScore;
 import com.geoshield.risk.geo.StateBoundaryIndex;
 import com.geoshield.risk.repository.RiskScoreRepository;
 import com.geoshield.risk.timeofday.MorthTimeOfDayDistribution;
+import com.geoshield.risk.weather.MorthWeatherSeverityTable;
+import com.geoshield.risk.weather.WeatherObservation;
+import com.geoshield.risk.weather.WeatherObservationProvider;
+import com.geoshield.risk.weather.WeatherObservationResult;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
@@ -70,6 +74,14 @@ class GeographicHistoricalRiskIntegrationTest {
     /** Table 7.3: 85,010 accidents in 15:00-18:00 relative to the 1,02,897 peak band. */
     private static final BigDecimal TIME_OF_DAY_NORMALIZED = new BigDecimal("82.61659718");
 
+    /** WMO 61 is slight rain, which maps to MoRTH's published "Rainy" condition. */
+    private static final int OBSERVED_WMO_CODE = 61;
+
+    /** Table 3.8: 12,665 killed in 35,284 rainy accidents, against the most severe published row. */
+    private static final BigDecimal WEATHER_NORMALIZED = new BigDecimal("79.06699039");
+
+    private static final String PROVIDER = "Open-Meteo";
+
     private static StateBoundaryIndex boundaryIndex;
 
     @Mock private HistoricalDataService historicalDataService;
@@ -90,14 +102,26 @@ class GeographicHistoricalRiskIntegrationTest {
     @BeforeEach
     void setUp() {
         userId = UUID.randomUUID();
-        assembler = new RiskContextAssembler(locationService, incidentService,
+        assembler = assemblerObserving(WeatherObservationResult.observed(
+                new WeatherObservation(PROVIDER, OBSERVED_WMO_CODE, FIXED_INSTANT)));
+        lenient().when(incidentService.getIncidents(userId)).thenReturn(List.of());
+        lenient().when(identityService.getUserById(userId)).thenReturn(user);
+    }
+
+    /**
+     * Builds the whole real chain around one fixed weather outcome. Every collaborator except the
+     * module boundaries is the production class, so the weather feature is produced by the same code
+     * the application runs; only the outbound HTTP call is replaced.
+     */
+    private RiskContextAssembler assemblerObserving(WeatherObservationResult weather) {
+        return new RiskContextAssembler(locationService, incidentService,
                 new BoundaryGeographicResolutionService(boundaryIndex),
                 new HistoricalRiskFeatureService(historicalDataService),
                 new IncidentRiskFeatureService(),
                 new TimeOfDayRiskService(Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                        new MorthTimeOfDayDistribution()));
-        lenient().when(incidentService.getIncidents(userId)).thenReturn(List.of());
-        lenient().when(identityService.getUserById(userId)).thenReturn(user);
+                        new MorthTimeOfDayDistribution()),
+                new WeatherRiskService(new FixedWeatherObservationProvider(weather),
+                        new MorthWeatherSeverityTable()));
     }
 
     private void storedLocationIs(BigDecimal latitude, BigDecimal longitude) {
@@ -142,7 +166,7 @@ class GeographicHistoricalRiskIntegrationTest {
     }
 
     @Test
-    void producesARealNonZeroLowScoreFromTheAvailableFactorsWithoutFabricatingTheOthers() {
+    void producesARealNonZeroScoreFromTheAvailableFactorsWithoutFabricatingTheOthers() {
         storedLocationIs(LATITUDE, LONGITUDE);
         morthPerLakhRecordsAreAvailable();
         var fusion = new BaselineRiskFusionService(approvedProperties(), identityService,
@@ -150,15 +174,16 @@ class GeographicHistoricalRiskIntegrationTest {
 
         BaselineRiskResult result = fusion.calculateBaselineRisk(assembler.assembleForCurrentUser(userId));
 
-        // 50.58977720 * 0.30 + 82.61659718 * 0.15 = 15.1769331600 + 12.3924895770.
-        assertEquals(0, result.score().compareTo(new BigDecimal("27.5694227370")));
-        assertEquals(RiskLevel.LOW, result.riskLevel());
+        // 50.58977720 * 0.30 + 79.06699039 * 0.20 + 82.61659718 * 0.15
+        // = 15.1769331600 + 15.8133980780 + 12.3924895770.
+        assertEquals(0, result.score().compareTo(new BigDecimal("43.3828208150")));
+        assertEquals(RiskLevel.MEDIUM, result.riskLevel());
 
         var historical = result.contributingFactors().stream()
                 .filter(factor -> factor.factor() == RiskFactorType.HISTORICAL_INCIDENT).findFirst().orElseThrow();
         assertTrue(historical.available());
         assertEquals(0, historical.weight().compareTo(new BigDecimal("0.30")));
-        // The historical contribution is untouched by the new time-of-day factor.
+        // The historical contribution is untouched by the time-of-day and weather factors.
         assertEquals(0, historical.contribution().compareTo(new BigDecimal("15.1769331600")));
 
         var timeOfDay = result.contributingFactors().stream()
@@ -166,18 +191,107 @@ class GeographicHistoricalRiskIntegrationTest {
         assertTrue(timeOfDay.available());
         assertEquals(0, timeOfDay.weight().compareTo(new BigDecimal("0.15")));
         assertEquals(0, timeOfDay.normalizedRisk().compareTo(TIME_OF_DAY_NORMALIZED));
+        // The time-of-day contribution is unchanged by the new weather factor.
         assertEquals(0, timeOfDay.contribution().compareTo(new BigDecimal("12.3924895770")));
+
+        var weather = result.contributingFactors().stream()
+                .filter(factor -> factor.factor() == RiskFactorType.WEATHER).findFirst().orElseThrow();
+        assertTrue(weather.available());
+        // The approved weight is used as configured; it is not adjusted to move the score.
+        assertEquals(0, weather.weight().compareTo(new BigDecimal("0.20")));
+        assertEquals(0, weather.normalizedRisk().compareTo(WEATHER_NORMALIZED));
+        assertEquals(0, weather.contribution().compareTo(new BigDecimal("15.8133980780")));
 
         // Every remaining factor stays explicitly unavailable and contributes exactly zero.
         assertTrue(result.contributingFactors().stream()
                 .filter(factor -> factor.factor() != RiskFactorType.HISTORICAL_INCIDENT
-                        && factor.factor() != RiskFactorType.TIME_OF_DAY)
+                        && factor.factor() != RiskFactorType.TIME_OF_DAY
+                        && factor.factor() != RiskFactorType.WEATHER)
                 .allMatch(factor -> !factor.available() && factor.normalizedRisk() == null
                         && factor.contribution().signum() == 0));
 
         ArgumentCaptor<RiskScore> saved = ArgumentCaptor.forClass(RiskScore.class);
         verify(riskScoreRepository).save(saved.capture());
-        assertEquals(28, saved.getValue().getScore());
+        assertEquals(43, saved.getValue().getScore());
+    }
+
+    @Test
+    void assemblesTheWeatherFeatureFromARealObservationMappedOntoThePublishedMorthTable() {
+        storedLocationIs(LATITUDE, LONGITUDE);
+        morthPerLakhRecordsAreAvailable();
+
+        BaselineRiskCalculationRequest context = assembler.assembleForCurrentUser(userId);
+
+        assertTrue(context.weatherRisk().available());
+        assertEquals(0, context.weatherRisk().normalizedRisk().compareTo(WEATHER_NORMALIZED));
+        assertNull(context.weatherRisk().unavailabilityReason());
+    }
+
+    @Test
+    void carriesBothRealWeatherSourcesWithoutClaimingMorthPublishesAZeroToHundredScore() {
+        var feature = new WeatherRiskService(
+                new FixedWeatherObservationProvider(WeatherObservationResult.observed(
+                        new WeatherObservation(PROVIDER, OBSERVED_WMO_CODE, FIXED_INSTANT))),
+                new MorthWeatherSeverityTable()).currentRisk(LATITUDE, LONGITUDE);
+
+        assertTrue(feature.available());
+        assertEquals(RiskFactorType.WEATHER, feature.factor());
+        // Who observed the weather, and who published the risk relationship - never conflated.
+        assertTrue(feature.source().contains(PROVIDER + " current weather observation"), feature.source());
+        assertTrue(feature.source().contains("MoRTH Road Accidents in India 2024, Table 3.8"), feature.source());
+        assertTrue(feature.reason().contains("Rainy"), feature.reason());
+        assertTrue(feature.reason().contains("MoRTH publishes no 0-100 weather risk score"), feature.reason());
+        assertTrue(feature.reason().contains("not tourist-specific"), feature.reason());
+    }
+
+    @Test
+    void keepsTheWeatherFactorUnavailableWhenTheProviderCannotBeReached() {
+        storedLocationIs(LATITUDE, LONGITUDE);
+        morthPerLakhRecordsAreAvailable();
+        var offline = assemblerObserving(WeatherObservationResult.unavailable(
+                "The Open-Meteo weather provider could not be reached."));
+
+        BaselineRiskCalculationRequest context = offline.assembleForCurrentUser(userId);
+
+        assertFalse(context.weatherRisk().available());
+        assertNull(context.weatherRisk().normalizedRisk());
+        // A weather outage never degrades the factors that do have real data.
+        assertTrue(context.historicalIncidentRisk().available());
+        assertTrue(context.timeOfDayRisk().available());
+    }
+
+    @Test
+    void keepsTheWeatherFactorUnavailableForAnObservationOutsideTheDocumentedMapping() {
+        storedLocationIs(LATITUDE, LONGITUDE);
+        // WMO 4 is smoke-reduced visibility, which MoRTH's published conditions do not cover.
+        var unmapped = assemblerObserving(WeatherObservationResult.observed(
+                new WeatherObservation(PROVIDER, 4, FIXED_INSTANT)));
+
+        BaselineRiskCalculationRequest context = unmapped.assembleForCurrentUser(userId);
+
+        assertFalse(context.weatherRisk().available());
+        assertNull(context.weatherRisk().normalizedRisk());
+        assertTrue(context.weatherRisk().unavailabilityReason().contains("outside the documented mapping"),
+                context.weatherRisk().unavailabilityReason());
+    }
+
+    @Test
+    void dropsTheWeatherContributionEntirelyWhenTheProviderIsUnreachable() {
+        storedLocationIs(LATITUDE, LONGITUDE);
+        morthPerLakhRecordsAreAvailable();
+        var offline = assemblerObserving(WeatherObservationResult.unavailable("provider offline"));
+        var fusion = new BaselineRiskFusionService(approvedProperties(), identityService,
+                riskScoreRepository, new ObjectMapper());
+
+        BaselineRiskResult result = fusion.calculateBaselineRisk(offline.assembleForCurrentUser(userId));
+
+        // Back to historical + time-of-day only; no default or last-known weather is substituted.
+        assertEquals(0, result.score().compareTo(new BigDecimal("27.5694227370")));
+        assertEquals(RiskLevel.LOW, result.riskLevel());
+        var weather = result.contributingFactors().stream()
+                .filter(factor -> factor.factor() == RiskFactorType.WEATHER).findFirst().orElseThrow();
+        assertFalse(weather.available());
+        assertEquals(0, weather.contribution().signum());
     }
 
     @Test
@@ -258,5 +372,23 @@ class GeographicHistoricalRiskIntegrationTest {
         return new RiskFusionProperties(new BigDecimal("0.30"), new BigDecimal("0.20"), new BigDecimal("0.15"),
                 new BigDecimal("0.15"), new BigDecimal("0.10"), new BigDecimal("0.05"), new BigDecimal("0.05"),
                 39, 59, 79);
+    }
+
+    /**
+     * Stands in for the Open-Meteo transport only. The WMO-code mapping, the MoRTH severity table, and
+     * the normalization all stay real, so no test here needs the Internet to reach a third party.
+     */
+    private record FixedWeatherObservationProvider(WeatherObservationResult result)
+            implements WeatherObservationProvider {
+
+        @Override
+        public WeatherObservationResult currentWeather(BigDecimal latitude, BigDecimal longitude) {
+            return result;
+        }
+
+        @Override
+        public String providerName() {
+            return PROVIDER;
+        }
     }
 }

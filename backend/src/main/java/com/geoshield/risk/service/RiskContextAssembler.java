@@ -24,16 +24,19 @@ public class RiskContextAssembler {
     private final HistoricalRiskFeatureService historicalRiskFeatureService;
     private final IncidentRiskFeatureService incidentRiskFeatureService;
     private final TimeOfDayRiskService timeOfDayRiskService;
+    private final WeatherRiskService weatherRiskService;
 
     public RiskContextAssembler(LocationService locationService, IncidentService incidentService,
             GeographicResolutionService geographicResolutionService, HistoricalRiskFeatureService historicalRiskFeatureService,
-            IncidentRiskFeatureService incidentRiskFeatureService, TimeOfDayRiskService timeOfDayRiskService) {
+            IncidentRiskFeatureService incidentRiskFeatureService, TimeOfDayRiskService timeOfDayRiskService,
+            WeatherRiskService weatherRiskService) {
         this.locationService = locationService;
         this.incidentService = incidentService;
         this.geographicResolutionService = geographicResolutionService;
         this.historicalRiskFeatureService = historicalRiskFeatureService;
         this.incidentRiskFeatureService = incidentRiskFeatureService;
         this.timeOfDayRiskService = timeOfDayRiskService;
+        this.weatherRiskService = weatherRiskService;
     }
 
     @Transactional(readOnly = true)
@@ -45,8 +48,10 @@ public class RiskContextAssembler {
         NormalizedRiskFeature historical = historicalRiskFeatureService.historicalIncidentRisk(resolution);
         NormalizedRiskFeature incidents = incidentRiskFeatureService.userReportRisk(userReports);
         NormalizedRiskFeature timeOfDay = timeOfDayRiskService.currentRisk();
-        RiskFeatureVector vector = new RiskFeatureVector(List.of(historical,
-                unavailable(RiskFactorType.WEATHER, "Weather provider", "No approved weather provider is configured."), timeOfDay,
+        // The coordinates go no further than the weather service boundary; the feature it returns
+        // carries the observed condition, never the location it was observed for.
+        NormalizedRiskFeature weather = weatherRiskService.currentRisk(location.latitude(), location.longitude());
+        RiskFeatureVector vector = new RiskFeatureVector(List.of(historical, weather, timeOfDay,
                 unavailable(RiskFactorType.SERVICE_PROXIMITY, "Emergency services", "No emergency-service proximity data source is configured."),
                 incidents, unavailable(RiskFactorType.CONNECTIVITY, "Client connectivity", "No client connectivity input contract is configured."),
                 unavailable(RiskFactorType.OTHER_CONTEXT, "Other context", "No other approved contextual signal is available.")));

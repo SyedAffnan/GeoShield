@@ -30,6 +30,7 @@ class RiskContextAssemblerTest {
     @Mock private HistoricalRiskFeatureService historicalRiskFeatureService;
     @Mock private IncidentRiskFeatureService incidentRiskFeatureService;
     @Mock private TimeOfDayRiskService timeOfDayRiskService;
+    @Mock private WeatherRiskService weatherRiskService;
 
     @Test
     void usesModuleBoundariesAndPassesOnlyExplicitFeatureAvailabilityToBaseline() {
@@ -44,16 +45,22 @@ class RiskContextAssemblerTest {
         when(historicalRiskFeatureService.historicalIncidentRisk(resolution)).thenReturn(feature(RiskFactorType.HISTORICAL_INCIDENT));
         when(incidentRiskFeatureService.userReportRisk(incidents)).thenReturn(feature(RiskFactorType.USER_REPORT));
         when(timeOfDayRiskService.currentRisk()).thenReturn(feature(RiskFactorType.TIME_OF_DAY));
+        when(weatherRiskService.currentRisk(BigDecimal.ONE, BigDecimal.ONE))
+                .thenReturn(feature(RiskFactorType.WEATHER));
 
         var context = new RiskContextAssembler(locationService, incidentService, geographicResolutionService,
-                historicalRiskFeatureService, incidentRiskFeatureService, timeOfDayRiskService).assembleForCurrentUser(userId);
+                historicalRiskFeatureService, incidentRiskFeatureService, timeOfDayRiskService,
+                weatherRiskService).assembleForCurrentUser(userId);
 
         verify(locationService).getCurrentLocation(userId);
         verify(incidentService).getIncidents(userId);
         verify(geographicResolutionService).resolve(BigDecimal.ONE, BigDecimal.ONE);
+        // Weather is asked for the stored location through its own service boundary, not inline.
+        verify(weatherRiskService).currentRisk(BigDecimal.ONE, BigDecimal.ONE);
         assertFalse(context.historicalIncidentRisk().available());
         assertTrue(context.historicalIncidentRisk().unavailabilityReason().contains("No mapping"));
         assertFalse(context.userReportRisk().available());
+        assertFalse(context.weatherRisk().available());
     }
 
     private NormalizedRiskFeature feature(RiskFactorType type) {

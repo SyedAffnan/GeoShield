@@ -43,7 +43,15 @@ geoshield:
     low-max: ${GEOSHIELD_RISK_LOW_MAX:39}
     medium-max: ${GEOSHIELD_RISK_MEDIUM_MAX:59}
     high-max: ${GEOSHIELD_RISK_HIGH_MAX:79}
-    # TODO(architecture-open): configure the approved weather provider when selected.
+  weather:
+    # Open-Meteo is the selected provider for Architecture v3.2 architecture-open item 1.
+    # It needs no API key or account, so there is no weather credential to store or rotate.
+    # Disabling this makes the weather factor report explicitly unavailable; it never
+    # falls back to a synthesized or default weather condition.
+    enabled: ${GEOSHIELD_WEATHER_ENABLED:true}
+    base-url: ${GEOSHIELD_WEATHER_BASE_URL:https://api.open-meteo.com}
+    connect-timeout: ${GEOSHIELD_WEATHER_CONNECT_TIMEOUT:PT2S}
+    read-timeout: ${GEOSHIELD_WEATHER_READ_TIMEOUT:PT3S}
   historical-data:
     ingestion:
       enabled: ${GEOSHIELD_HISTORICAL_INGESTION_ENABLED:false}

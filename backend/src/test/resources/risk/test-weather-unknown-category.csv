@@ -1,0 +1,8 @@
+# Invalid on purpose: "Snowy" is not a condition MoRTH Table 3.8 publishes.
+# Used to prove the loader refuses an invented category rather than inventing statistics for it.
+category,accidents_2024,killed_2024
+Sunny / clear,372387,128513
+Rainy,35284,12665
+Snowy,33955,15115
+Hail / sleet,4310,1919
+Others,41771,18963
