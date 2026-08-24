@@ -1,0 +1,14 @@
+{
+  "name": "geoshield-geodata-tools",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Dev-only, offline preprocessing for the GeoShield State/UT boundary resource. Not a build or runtime dependency of the backend.",
+  "scripts": {
+    "validate": "node validate-projection.mjs",
+    "preprocess": "node --max-old-space-size=4096 preprocess-boundaries.mjs"
+  },
+  "devDependencies": {
+    "proj4": "^2.21.0"
+  }
+}

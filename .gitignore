@@ -3,6 +3,9 @@ backend/target/
 backend/maven-target/
 backend/.mvn/
 
+# Offline geodata preprocessing tools (dev-only; not a build or runtime dependency)
+tools/geodata/node_modules/
+
 # Flutter / Dart
 mobile/.dart_tool/
 mobile/.flutter-plugins

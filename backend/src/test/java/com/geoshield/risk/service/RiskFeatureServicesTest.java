@@ -2,6 +2,7 @@ package com.geoshield.risk.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
@@ -11,6 +12,7 @@ import com.geoshield.historicaldata.service.HistoricalDataService;
 import com.geoshield.incident.dto.IncidentResponse;
 import com.geoshield.incident.entity.IncidentSourceType;
 import com.geoshield.risk.dto.GeographicResolution;
+import com.geoshield.risk.geo.StateBoundaryIndex;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
@@ -40,8 +42,11 @@ class RiskFeatureServicesTest {
 
     @Test
     void unresolvedGeographyAndIncidentRecordsDoNotProduceFabricatedScores() {
-        var geographic = new UnresolvedGeographicResolutionService().resolve(BigDecimal.ONE, BigDecimal.ONE);
+        // (1, 1) is in the Gulf of Guinea, so the real resolver finds no containing State/UT.
+        var geographic = new BoundaryGeographicResolutionService(new StateBoundaryIndex())
+                .resolve(BigDecimal.ONE, BigDecimal.ONE);
         assertFalse(geographic.resolved());
+        assertNull(geographic.geographicUnit());
         var incident = new IncidentRiskFeatureService().userReportRisk(List.of(new IncidentResponse(UUID.randomUUID(), "Hazard",
                 "Description", BigDecimal.ONE, BigDecimal.ONE, "REPORTED", "a".repeat(64), IncidentSourceType.USER_REPORTED, Instant.now())));
         assertFalse(incident.available());
