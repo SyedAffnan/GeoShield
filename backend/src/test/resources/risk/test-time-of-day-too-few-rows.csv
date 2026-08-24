@@ -1,0 +1,10 @@
+# Test fixture: only 7 interval rows, so the loader must reject it rather than
+# silently serving an incomplete distribution.
+start_hour,end_hour,accidents_2024,published_share_percent,day_night
+0,3,25001,5.1,Night
+3,6,23398,4.8,Night
+6,9,49395,10.1,Day
+9,12,68287,14.0,Day
+12,15,71386,14.6,Day
+15,18,85010,17.4,Day
+18,21,102897,21.1,Night

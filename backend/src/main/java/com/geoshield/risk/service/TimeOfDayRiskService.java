@@ -3,22 +3,98 @@ package com.geoshield.risk.service;
 import com.geoshield.risk.dto.NormalizedRiskFeature;
 import com.geoshield.risk.dto.RiskFactorType;
 import com.geoshield.risk.dto.TimeOfDayBand;
+import com.geoshield.risk.timeofday.MorthTimeOfDayDistribution;
+import com.geoshield.risk.timeofday.TimeOfDayInterval;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.util.Optional;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+/**
+ * Maps the current time to its MoRTH 3-hour interval and normalizes that interval's published
+ * national accident count into the time-of-day risk feature.
+ *
+ * <p>The distribution is a national aggregate for India. It is not State/UT-specific and not
+ * tourist-specific, matching Architecture v3.2 Section 29's {@code timeIntervalRiskShare}
+ * definition ("MoRTH, national % share by 3-hour band").
+ *
+ * <p>Bands are resolved in {@link MorthTimeOfDayDistribution#SOURCE_ZONE_ID} because MoRTH's
+ * times of occurrence are Indian local time. Resolving them in UTC instead would shift every
+ * lookup by 5.5 hours and silently report the wrong published interval.
+ *
+ * <p>In production the {@link Clock} is the real system clock; tests inject a fixed clock rather
+ * than changing system time.
+ */
 @Service
 public class TimeOfDayRiskService {
     private final Clock clock;
-    public TimeOfDayRiskService() { this(Clock.systemUTC()); }
-    TimeOfDayRiskService(Clock clock) { this.clock = clock; }
-    public TimeOfDayBand currentBand() { return bandAt(clock.instant()); }
-    TimeOfDayBand bandAt(Instant instant) { int start = instant.atZone(java.time.ZoneOffset.UTC).getHour() / 3 * 3; return new TimeOfDayBand(start, start + 2); }
+    private final MorthTimeOfDayDistribution distribution;
+
+    /** Production wiring: MoRTH's own zone, driven by the real system clock. */
+    @Autowired
+    public TimeOfDayRiskService(MorthTimeOfDayDistribution distribution) {
+        this(Clock.system(ZoneId.of(MorthTimeOfDayDistribution.SOURCE_ZONE_ID)), distribution);
+    }
+
+    /** Test wiring: a fixed clock, so system time is never modified. */
+    TimeOfDayRiskService(Clock clock, MorthTimeOfDayDistribution distribution) {
+        this.clock = clock;
+        this.distribution = distribution;
+    }
+
+    /** The MoRTH interval containing the current instant, in Indian local time. */
+    public TimeOfDayBand currentBand() {
+        return bandAt(clock.instant());
+    }
+
+    TimeOfDayBand bandAt(Instant instant) {
+        int start = sourceHourOf(instant) / 3 * 3;
+        return new TimeOfDayBand(start, start + 3);
+    }
+
+    /**
+     * The normalized time-of-day risk for the current instant.
+     *
+     * <p>Available only when the verified MoRTH distribution loaded and the current hour maps to
+     * a published interval. No value is ever synthesized for a missing interval.
+     */
     public NormalizedRiskFeature currentRisk() {
-        TimeOfDayBand band = currentBand();
-        return NormalizedRiskFeature.unavailable(RiskFactorType.TIME_OF_DAY, "MoRTH time-band distribution",
-                "Current UTC time is in the " + band.startHourUtc() + "–" + band.endHourUtc()
-                        + " hour band, but no MoRTH 3-hour distribution is imported.",
-                "Requires actual imported national 3-hour time-band data; no score is synthesized.");
+        return riskAt(clock.instant());
+    }
+
+    NormalizedRiskFeature riskAt(Instant instant) {
+        TimeOfDayBand band = bandAt(instant);
+        if (!distribution.isLoaded()) {
+            return NormalizedRiskFeature.unavailable(RiskFactorType.TIME_OF_DAY,
+                    MorthTimeOfDayDistribution.SOURCE, distribution.unavailabilityReason(),
+                    "Requires the verified MoRTH 3-hour interval distribution; no score is synthesized.");
+        }
+        Optional<TimeOfDayInterval> interval = distribution.intervalAtHour(sourceHourOf(instant));
+        if (interval.isEmpty()) {
+            return NormalizedRiskFeature.unavailable(RiskFactorType.TIME_OF_DAY,
+                    MorthTimeOfDayDistribution.SOURCE,
+                    "MoRTH Table 7.3 publishes no time interval covering the " + band.startHour() + "–"
+                            + band.endHour() + " hour band in Indian local time.",
+                    "Requires a published MoRTH interval for the current hour; no score is synthesized.");
+        }
+        TimeOfDayInterval published = interval.get();
+        return new NormalizedRiskFeature(RiskFactorType.TIME_OF_DAY, published.normalizedRisk(), true,
+                MorthTimeOfDayDistribution.SOURCE, explain(published), MorthTimeOfDayDistribution.NORMALIZATION);
+    }
+
+    /** Names the interval, its published values, and its national, non-tourist-specific scope. */
+    private String explain(TimeOfDayInterval published) {
+        return "Indian local time falls in MoRTH's " + published.label() + " interval ("
+                + published.dayNight() + "), which recorded " + published.accidents() + " road accidents in 2024, "
+                + published.publishedSharePercent().stripTrailingZeros().toPlainString()
+                + "% of the national total. National aggregate for 2024; not State/UT-specific and not"
+                + " tourist-specific.";
+    }
+
+    /** The hour-of-day in MoRTH's own reference zone, which is Indian local time. */
+    private int sourceHourOf(Instant instant) {
+        return instant.atZone(ZoneId.of(MorthTimeOfDayDistribution.SOURCE_ZONE_ID)).getHour();
     }
 }

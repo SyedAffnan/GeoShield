@@ -13,6 +13,7 @@ import com.geoshield.incident.dto.IncidentResponse;
 import com.geoshield.incident.entity.IncidentSourceType;
 import com.geoshield.risk.dto.GeographicResolution;
 import com.geoshield.risk.geo.StateBoundaryIndex;
+import com.geoshield.risk.timeofday.MorthTimeOfDayDistribution;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
@@ -54,11 +55,16 @@ class RiskFeatureServicesTest {
     }
 
     @Test
-    void categorizesCurrentTimeIntoArchitectureAlignedThreeHourBandWithoutSynthesizingScore() {
-        TimeOfDayRiskService service = new TimeOfDayRiskService(Clock.fixed(Instant.parse("2026-01-01T22:15:00Z"), ZoneOffset.UTC));
-        assertEquals(21, service.currentBand().startHourUtc());
-        assertEquals(23, service.currentBand().endHourUtc());
-        assertFalse(service.currentRisk().available());
+    void categorizesCurrentTimeIntoArchitectureAlignedThreeHourBandUsingOnlyPublishedMorthValues() {
+        // 22:15Z is 03:45 Indian local time, so MoRTH's 03:00 to 06:00 band applies.
+        TimeOfDayRiskService service = new TimeOfDayRiskService(
+                Clock.fixed(Instant.parse("2026-01-01T22:15:00Z"), ZoneOffset.UTC), new MorthTimeOfDayDistribution());
+        assertEquals(3, service.currentBand().startHour());
+        assertEquals(6, service.currentBand().endHour());
+        var feature = service.currentRisk();
+        assertTrue(feature.available());
+        // The published 23,398 accidents relative to the 1,02,897 peak band; nothing is synthesized.
+        assertEquals(new BigDecimal("22.73924410"), feature.value());
     }
 
     private HistoricalSafetyRecordSummary record(String unit, String metric, int value) { return record(unit, metric, value, false); }

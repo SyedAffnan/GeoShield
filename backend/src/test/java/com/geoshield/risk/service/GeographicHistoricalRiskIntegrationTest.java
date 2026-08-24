@@ -25,6 +25,7 @@ import com.geoshield.risk.dto.RiskLevel;
 import com.geoshield.risk.entity.RiskScore;
 import com.geoshield.risk.geo.StateBoundaryIndex;
 import com.geoshield.risk.repository.RiskScoreRepository;
+import com.geoshield.risk.timeofday.MorthTimeOfDayDistribution;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
@@ -47,7 +48,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
  * <p>Only the module service boundaries that need infrastructure (Location, Incident,
  * Identity, Historical Data, and the risk-score repository) are stubbed. The
  * geographic resolution, historical normalization, assembly, and fusion are all real.
- * The historical values below are the actual MoRTH 2024 per-lakh figures.
+ * The historical values below are the actual MoRTH 2024 per-lakh figures, and the
+ * time-of-day values are the actual MoRTH 2024 Table 7.3 figures loaded from the bundled
+ * resource. The clock is fixed so the assertions are stable; system time is never modified.
  */
 @ExtendWith(MockitoExtension.class)
 class GeographicHistoricalRiskIntegrationTest {
@@ -60,6 +63,12 @@ class GeographicHistoricalRiskIntegrationTest {
     // Bengaluru, Karnataka.
     private static final BigDecimal LATITUDE = new BigDecimal("12.9716");
     private static final BigDecimal LONGITUDE = new BigDecimal("77.5946");
+
+    /** 10:00Z is 15:30 Indian local time, so MoRTH's 15:00 to 18:00 band applies. */
+    private static final Instant FIXED_INSTANT = Instant.parse("2026-08-24T10:00:00Z");
+
+    /** Table 7.3: 85,010 accidents in 15:00-18:00 relative to the 1,02,897 peak band. */
+    private static final BigDecimal TIME_OF_DAY_NORMALIZED = new BigDecimal("82.61659718");
 
     private static StateBoundaryIndex boundaryIndex;
 
@@ -85,7 +94,8 @@ class GeographicHistoricalRiskIntegrationTest {
                 new BoundaryGeographicResolutionService(boundaryIndex),
                 new HistoricalRiskFeatureService(historicalDataService),
                 new IncidentRiskFeatureService(),
-                new TimeOfDayRiskService(Clock.fixed(Instant.parse("2026-08-24T10:00:00Z"), ZoneOffset.UTC)));
+                new TimeOfDayRiskService(Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
+                        new MorthTimeOfDayDistribution()));
         lenient().when(incidentService.getIncidents(userId)).thenReturn(List.of());
         lenient().when(identityService.getUserById(userId)).thenReturn(user);
     }
@@ -132,7 +142,7 @@ class GeographicHistoricalRiskIntegrationTest {
     }
 
     @Test
-    void producesARealNonZeroLowScoreFromTheHistoricalFactorAloneWithoutFabricatingOthers() {
+    void producesARealNonZeroLowScoreFromTheAvailableFactorsWithoutFabricatingTheOthers() {
         storedLocationIs(LATITUDE, LONGITUDE);
         morthPerLakhRecordsAreAvailable();
         var fusion = new BaselineRiskFusionService(approvedProperties(), identityService,
@@ -140,25 +150,58 @@ class GeographicHistoricalRiskIntegrationTest {
 
         BaselineRiskResult result = fusion.calculateBaselineRisk(assembler.assembleForCurrentUser(userId));
 
-        // 50.58977720 * 0.30 = 15.1769331600, and nothing else contributes.
-        assertEquals(0, result.score().compareTo(new BigDecimal("15.1769331600")));
+        // 50.58977720 * 0.30 + 82.61659718 * 0.15 = 15.1769331600 + 12.3924895770.
+        assertEquals(0, result.score().compareTo(new BigDecimal("27.5694227370")));
         assertEquals(RiskLevel.LOW, result.riskLevel());
 
         var historical = result.contributingFactors().stream()
                 .filter(factor -> factor.factor() == RiskFactorType.HISTORICAL_INCIDENT).findFirst().orElseThrow();
         assertTrue(historical.available());
         assertEquals(0, historical.weight().compareTo(new BigDecimal("0.30")));
-        assertTrue(historical.contribution().signum() > 0, "the historical contribution must be genuinely non-zero");
+        // The historical contribution is untouched by the new time-of-day factor.
+        assertEquals(0, historical.contribution().compareTo(new BigDecimal("15.1769331600")));
 
-        // Every other factor stays explicitly unavailable and contributes exactly zero.
+        var timeOfDay = result.contributingFactors().stream()
+                .filter(factor -> factor.factor() == RiskFactorType.TIME_OF_DAY).findFirst().orElseThrow();
+        assertTrue(timeOfDay.available());
+        assertEquals(0, timeOfDay.weight().compareTo(new BigDecimal("0.15")));
+        assertEquals(0, timeOfDay.normalizedRisk().compareTo(TIME_OF_DAY_NORMALIZED));
+        assertEquals(0, timeOfDay.contribution().compareTo(new BigDecimal("12.3924895770")));
+
+        // Every remaining factor stays explicitly unavailable and contributes exactly zero.
         assertTrue(result.contributingFactors().stream()
-                .filter(factor -> factor.factor() != RiskFactorType.HISTORICAL_INCIDENT)
+                .filter(factor -> factor.factor() != RiskFactorType.HISTORICAL_INCIDENT
+                        && factor.factor() != RiskFactorType.TIME_OF_DAY)
                 .allMatch(factor -> !factor.available() && factor.normalizedRisk() == null
                         && factor.contribution().signum() == 0));
 
         ArgumentCaptor<RiskScore> saved = ArgumentCaptor.forClass(RiskScore.class);
         verify(riskScoreRepository).save(saved.capture());
-        assertEquals(15, saved.getValue().getScore());
+        assertEquals(28, saved.getValue().getScore());
+    }
+
+    @Test
+    void assemblesTheTimeOfDayFeatureFromTheVerifiedMorthTableWithoutTouchingAnyRepository() {
+        storedLocationIs(LATITUDE, LONGITUDE);
+        morthPerLakhRecordsAreAvailable();
+
+        BaselineRiskCalculationRequest context = assembler.assembleForCurrentUser(userId);
+
+        assertTrue(context.timeOfDayRisk().available());
+        assertEquals(0, context.timeOfDayRisk().normalizedRisk().compareTo(TIME_OF_DAY_NORMALIZED));
+        assertNull(context.timeOfDayRisk().unavailabilityReason());
+    }
+
+    @Test
+    void keepsTheTimeOfDayFactorAvailableEvenWhereNoStateUtResolves() {
+        // Mid Bay of Bengal: the national time-of-day distribution does not depend on geography.
+        storedLocationIs(new BigDecimal("15.0"), new BigDecimal("85.0"));
+
+        BaselineRiskCalculationRequest context = assembler.assembleForCurrentUser(userId);
+
+        assertFalse(context.historicalIncidentRisk().available());
+        assertTrue(context.timeOfDayRisk().available());
+        assertEquals(0, context.timeOfDayRisk().normalizedRisk().compareTo(TIME_OF_DAY_NORMALIZED));
     }
 
     @Test
