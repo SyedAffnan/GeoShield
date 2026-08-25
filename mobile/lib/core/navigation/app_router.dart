@@ -1,13 +1,17 @@
-import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
-/// Route guards and role-specific routes are scaffolded without screen implementations.
+import '../../features/auth/presentation/login_screen.dart';
+import '../../features/auth/presentation/session_gate.dart';
+import '../../features/incidents/presentation/incidents_screen.dart';
+import '../../features/risk/presentation/risk_dashboard_screen.dart';
+
 final GoRouter appRouter = GoRouter(
-  initialLocation: '/login',
+  initialLocation: '/',
   routes: <RouteBase>[
-    GoRoute(path: '/login', builder: (_, __) => const SizedBox.shrink()),
-    GoRoute(path: '/responder', builder: (_, __) => const SizedBox.shrink()),
-    GoRoute(path: '/admin', builder: (_, __) => const SizedBox.shrink()),
+    GoRoute(path: '/', builder: (_, __) => const SessionGate()),
+    GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
+    GoRoute(
+        path: '/dashboard', builder: (_, __) => const RiskDashboardScreen()),
+    GoRoute(path: '/incidents', builder: (_, __) => const IncidentsScreen()),
   ],
-  // TODO: implement approved authentication and role guard using the auth-state provider.
 );

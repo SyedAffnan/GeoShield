@@ -1,1 +1,4 @@
-class NetworkException implements Exception { const NetworkException(); }
+class NetworkException implements Exception {
+  const NetworkException(this.message);
+  final String message;
+}
