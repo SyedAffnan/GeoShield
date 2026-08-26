@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
-import '../../risk/data/risk_repository.dart';
 
 class IncidentsScreen extends ConsumerWidget {
   const IncidentsScreen({super.key});
@@ -82,9 +81,9 @@ class IncidentsScreen extends ConsumerWidget {
               onPressed: () async {
                 if (!formKey.currentState!.validate()) return;
                 try {
-                  final location = CurrentLocation.fromJson(await ref
-                      .read(apiClientProvider)
-                      .getData('/api/v1/locations'));
+                  final location = await ref
+                      .read(locationRepositoryProvider)
+                      .getCurrentLocation();
                   await ref.read(incidentRepositoryProvider).report(
                         type: typeController.text.trim(),
                         description: descriptionController.text.trim(),

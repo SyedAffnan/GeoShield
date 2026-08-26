@@ -37,9 +37,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           );
       if (!mounted) return;
       if (!session.isTourist) {
+        // The backend exposes no ADMIN or RESPONDER endpoints, so there is no
+        // privileged dashboard to route to. The session is discarded rather than
+        // shown a tourist screen it is not authorized for.
         await ref.read(authControllerProvider.notifier).logout();
         setState(() => _error =
-            'This demonstration dashboard is available to tourist accounts only.');
+            'The GeoShield backend currently exposes no ${session.role} features. '
+            'Sign in with a tourist account to view the safety dashboard.');
         return;
       }
       context.go('/dashboard');
@@ -63,6 +67,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final isLoading = ref.watch(authControllerProvider).isLoading;
     return Scaffold(
+      appBar: AppBar(
+        actions: [
+          IconButton(
+            tooltip: 'API configuration',
+            onPressed: () => context.push('/settings'),
+            icon: const Icon(Icons.settings_outlined),
+          ),
+        ],
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -129,6 +142,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 child:
                                     CircularProgressIndicator(strokeWidth: 2))
                             : const Text('Sign in'),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed:
+                            isLoading ? null : () => context.push('/register'),
+                        child: const Text('New to GeoShield? Create account'),
                       ),
                     ],
                   ),

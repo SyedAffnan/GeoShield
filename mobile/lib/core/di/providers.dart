@@ -4,8 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/auth/data/auth_repository.dart';
 import '../../features/incidents/data/incident_repository.dart';
+import '../../features/location/data/location_repository.dart';
 import '../../features/risk/data/risk_repository.dart';
+import '../location/device_location_service.dart';
 import '../network/api_client.dart';
+import '../network/api_configuration.dart';
+import '../network/auth_exception.dart';
+import '../network/validation_exception.dart';
 import '../storage/secure_session_storage.dart';
 
 final secureSessionStorageProvider = Provider<SecureSessionStorage>((ref) {
@@ -15,6 +20,46 @@ final secureSessionStorageProvider = Provider<SecureSessionStorage>((ref) {
 final apiClientProvider = Provider<GeoShieldApiClient>((ref) {
   return GeoShieldApiClient(ref.watch(secureSessionStorageProvider));
 });
+
+final apiConfigurationProvider =
+    AsyncNotifierProvider<ApiConfigurationController, ApiConfiguration>(
+  ApiConfigurationController.new,
+);
+
+/// Runtime API-origin configuration. A saved value takes precedence over dart-define.
+class ApiConfigurationController extends AsyncNotifier<ApiConfiguration> {
+  @override
+  FutureOr<ApiConfiguration> build() async {
+    final storage = ref.read(secureSessionStorageProvider);
+    final savedUrl = await storage.readBackendBaseUrl();
+    final effectiveUrl = savedUrl == null || savedUrl.isEmpty
+        ? GeoShieldApiClient.defaultBaseUrl
+        : GeoShieldApiClient.normalizeBaseUrl(savedUrl);
+    ref.read(apiClientProvider).setBaseUrl(effectiveUrl);
+    return ApiConfiguration(
+      effectiveBaseUrl: effectiveUrl,
+      customBaseUrl: (savedUrl?.isEmpty ?? true) ? null : effectiveUrl,
+    );
+  }
+
+  Future<void> saveCustomBaseUrl(String value) async {
+    final normalized = GeoShieldApiClient.normalizeBaseUrl(value);
+    await ref.read(secureSessionStorageProvider).saveBackendBaseUrl(normalized);
+    ref.read(apiClientProvider).setBaseUrl(normalized);
+    state = AsyncData(ApiConfiguration(
+      effectiveBaseUrl: normalized,
+      customBaseUrl: normalized,
+    ));
+  }
+
+  Future<void> useDefault() async {
+    await ref.read(secureSessionStorageProvider).clearBackendBaseUrl();
+    ref.read(apiClientProvider).setBaseUrl(GeoShieldApiClient.defaultBaseUrl);
+    state = const AsyncData(ApiConfiguration(
+      effectiveBaseUrl: GeoShieldApiClient.defaultBaseUrl,
+    ));
+  }
+}
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepository(
@@ -50,14 +95,64 @@ class AuthController extends AsyncNotifier<Session?> {
   }
 }
 
+final deviceLocationServiceProvider = Provider<DeviceLocationService>((ref) {
+  return const GeolocatorDeviceLocationService();
+});
+
+final locationRepositoryProvider = Provider<LocationRepository>((ref) {
+  return LocationRepository(ref.watch(apiClientProvider));
+});
+
 final riskRepositoryProvider = Provider<RiskRepository>((ref) {
   return RiskRepository(ref.watch(apiClientProvider));
 });
 
-final riskDashboardProvider =
-    FutureProvider.autoDispose<RiskDashboardData>((ref) {
-  return ref.watch(riskRepositoryProvider).loadDashboard();
-});
+final riskDashboardProvider = NotifierProvider.autoDispose<
+    RiskDashboardController, RiskDashboardState>(RiskDashboardController.new);
+
+/// Drives phone GPS -> `POST /api/v1/locations` -> `GET /api/v1/risk`. Every value
+/// shown on the dashboard comes from the backend; nothing is scored on the device.
+class RiskDashboardController extends AutoDisposeNotifier<RiskDashboardState> {
+  bool _disposed = false;
+
+  @override
+  RiskDashboardState build() {
+    ref.onDispose(() => _disposed = true);
+    Future.microtask(refresh);
+    return const RiskDashboardBusy(RiskDashboardStep.obtainingLocation);
+  }
+
+  Future<void> refresh() async {
+    _emit(const RiskDashboardBusy(RiskDashboardStep.obtainingLocation));
+    final result =
+        await ref.read(deviceLocationServiceProvider).currentPosition();
+    if (result is DeviceLocationFailure) {
+      _emit(RiskDashboardLocationBlocked(result.reason));
+      return;
+    }
+    final fix = result as DeviceLocationFix;
+    try {
+      _emit(const RiskDashboardBusy(RiskDashboardStep.sendingLocation));
+      final storedLocation =
+          await ref.read(locationRepositoryProvider).submitCurrentLocation(fix);
+      _emit(const RiskDashboardBusy(RiskDashboardStep.loadingRisk));
+      final risk = await ref.read(riskRepositoryProvider).getCurrentRisk();
+      _emit(RiskDashboardReady(RiskDashboardData(
+          fix: fix, storedLocation: storedLocation, risk: risk)));
+    } on AuthException {
+      _emit(const RiskDashboardFailed(RiskDashboardFailureKind.session));
+    } on ValidationException catch (error) {
+      _emit(RiskDashboardFailed(RiskDashboardFailureKind.serverRejected,
+          message: error.message));
+    } catch (_) {
+      _emit(const RiskDashboardFailed(RiskDashboardFailureKind.network));
+    }
+  }
+
+  void _emit(RiskDashboardState next) {
+    if (!_disposed) state = next;
+  }
+}
 
 final incidentRepositoryProvider = Provider<IncidentRepository>((ref) {
   return IncidentRepository(ref.watch(apiClientProvider));

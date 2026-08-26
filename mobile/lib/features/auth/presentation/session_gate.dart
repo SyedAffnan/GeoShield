@@ -9,7 +9,14 @@ class SessionGate extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final apiConfiguration = ref.watch(apiConfigurationProvider);
     final session = ref.watch(authControllerProvider);
+    if (apiConfiguration.isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (apiConfiguration.hasError) {
+      return _message(context, 'Unable to restore the API configuration.');
+    }
     return session.when(
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),

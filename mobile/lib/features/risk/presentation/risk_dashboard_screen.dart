@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/di/providers.dart';
-import '../../../core/network/auth_exception.dart';
+import '../../../core/location/device_location_service.dart';
 import '../data/risk_repository.dart';
 
 class RiskDashboardScreen extends ConsumerWidget {
@@ -11,15 +11,23 @@ class RiskDashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final dashboard = ref.watch(riskDashboardProvider);
+    final state = ref.watch(riskDashboardProvider);
     return Scaffold(
       appBar: AppBar(
         title: const Text('GeoShield Safety'),
         actions: [
           IconButton(
             tooltip: 'Refresh risk',
-            onPressed: () => ref.invalidate(riskDashboardProvider),
+            onPressed: () => ref.read(riskDashboardProvider.notifier).refresh(),
             icon: const Icon(Icons.refresh),
+          ),
+          IconButton(
+            tooltip: 'API configuration',
+            onPressed: () async {
+              await context.push('/settings');
+              await ref.read(riskDashboardProvider.notifier).refresh();
+            },
+            icon: const Icon(Icons.settings_outlined),
           ),
           IconButton(
             tooltip: 'Sign out',
@@ -31,68 +39,168 @@ class RiskDashboardScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: dashboard.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => _DashboardError(error: error),
-        data: (data) => _DashboardContent(data: data),
-      ),
+      body: switch (state) {
+        RiskDashboardBusy(step: final step) => _Busy(step: step),
+        RiskDashboardLocationBlocked(reason: final reason) =>
+          _LocationBlocked(reason: reason),
+        RiskDashboardFailed(kind: final kind, message: final message) =>
+          _RequestFailed(kind: kind, message: message),
+        RiskDashboardReady(data: final data) => _DashboardContent(data: data),
+      },
     );
   }
 }
 
-class _DashboardError extends ConsumerWidget {
-  const _DashboardError({required this.error});
-  final Object error;
+class _Busy extends StatelessWidget {
+  const _Busy({required this.step});
+  final RiskDashboardStep step;
+
+  @override
+  Widget build(BuildContext context) => Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const CircularProgressIndicator(),
+          const SizedBox(height: 16),
+          Text(switch (step) {
+            RiskDashboardStep.obtainingLocation =>
+              'Obtaining your current GPS location…',
+            RiskDashboardStep.sendingLocation =>
+              'Sending your location to GeoShield…',
+            RiskDashboardStep.loadingRisk =>
+              'Loading your safety score…',
+          }),
+        ]),
+      );
+}
+
+/// No GPS fix was produced, so no risk request was made. Each reason offers the
+/// one action that can actually resolve it.
+class _LocationBlocked extends ConsumerWidget {
+  const _LocationBlocked({required this.reason});
+  final DeviceLocationFailureReason reason;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isAuthFailure = error is AuthException;
-    final isLocationUnavailable = error is LocationUnavailableException;
-    final message = isAuthFailure
-        ? 'Your session has expired. Please sign in again.'
-        : isLocationUnavailable
-            ? 'Current location is unavailable. Update your location before requesting safety information.'
-            : 'Unable to load current safety information. Please check your connection and try again.';
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(isLocationUnavailable ? Icons.location_off : Icons.cloud_off,
-              size: 48),
-          const SizedBox(height: 16),
-          Text(message, textAlign: TextAlign.center),
-          const SizedBox(height: 16),
-          FilledButton(
-            onPressed: () async {
-              if (isAuthFailure) {
-                await ref.read(authControllerProvider.notifier).logout();
-                if (context.mounted) context.go('/login');
-              } else {
-                ref.invalidate(riskDashboardProvider);
-              }
-            },
-            child: Text(isAuthFailure ? 'Sign in' : 'Refresh risk'),
-          ),
-        ]),
-      ),
+    final (String message, String actionLabel) = switch (reason) {
+      DeviceLocationFailureReason.servicesDisabled => (
+          'Location services are switched off on this phone. Turn on location, then try again.',
+          'Open location settings',
+        ),
+      DeviceLocationFailureReason.permissionDenied => (
+          'GeoShield needs location permission to read your current position. '
+              'Your safety score is calculated by the server from that position.',
+          'Allow location access',
+        ),
+      DeviceLocationFailureReason.permissionDeniedForever => (
+          'Location permission is permanently denied for GeoShield. Enable it in Android app '
+              'settings under Permissions → Location, then return here.',
+          'Open app settings',
+        ),
+      DeviceLocationFailureReason.timeout => (
+          'Your phone did not return a GPS fix in time. Move to a spot with a clearer view of '
+              'the sky and try again.',
+          'Try again',
+        ),
+      DeviceLocationFailureReason.unavailable => (
+          'Your current location is unavailable, so no safety score can be requested.',
+          'Try again',
+        ),
+    };
+
+    return _Message(
+      icon: Icons.location_off,
+      message: message,
+      actionLabel: actionLabel,
+      onPressed: () async {
+        final service = ref.read(deviceLocationServiceProvider);
+        switch (reason) {
+          case DeviceLocationFailureReason.servicesDisabled:
+            await service.openLocationSettings();
+          case DeviceLocationFailureReason.permissionDeniedForever:
+            await service.openAppSettings();
+          case DeviceLocationFailureReason.permissionDenied:
+          case DeviceLocationFailureReason.timeout:
+          case DeviceLocationFailureReason.unavailable:
+            break;
+        }
+        await ref.read(riskDashboardProvider.notifier).refresh();
+      },
     );
   }
 }
 
-class _DashboardContent extends StatelessWidget {
+class _RequestFailed extends ConsumerWidget {
+  const _RequestFailed({required this.kind, required this.message});
+  final RiskDashboardFailureKind kind;
+  final String? message;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isSessionFailure = kind == RiskDashboardFailureKind.session;
+    return _Message(
+      icon: isSessionFailure ? Icons.lock_outline : Icons.cloud_off,
+      message: switch (kind) {
+        RiskDashboardFailureKind.session =>
+          'Your session has expired. Please sign in again.',
+        RiskDashboardFailureKind.serverRejected => message ??
+            'The server rejected the submitted location. Please try again.',
+        RiskDashboardFailureKind.network =>
+          'Unable to reach GeoShield. Check your connection or the configured backend URL, '
+              'then try again.',
+      },
+      actionLabel: isSessionFailure ? 'Sign in' : 'Try again',
+      onPressed: () async {
+        if (isSessionFailure) {
+          await ref.read(authControllerProvider.notifier).logout();
+          if (context.mounted) context.go('/login');
+          return;
+        }
+        await ref.read(riskDashboardProvider.notifier).refresh();
+      },
+    );
+  }
+}
+
+class _Message extends StatelessWidget {
+  const _Message({
+    required this.icon,
+    required this.message,
+    required this.actionLabel,
+    required this.onPressed,
+  });
+  final IconData icon;
+  final String message;
+  final String actionLabel;
+  final Future<void> Function() onPressed;
+
+  @override
+  Widget build(BuildContext context) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Icon(icon, size: 48),
+            const SizedBox(height: 16),
+            Text(message, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            FilledButton(onPressed: onPressed, child: Text(actionLabel)),
+          ]),
+        ),
+      );
+}
+
+class _DashboardContent extends ConsumerWidget {
   const _DashboardContent({required this.data});
   final RiskDashboardData data;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final risk = data.risk;
     final color = _riskColor(context, risk.riskLevel);
     return RefreshIndicator(
-      onRefresh: () async {},
+      onRefresh: () => ref.read(riskDashboardProvider.notifier).refresh(),
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _LocationStatus(location: data.location),
+          _LocationStatus(data: data),
           const SizedBox(height: 16),
           Card(
             color: color.withValues(alpha: 0.10),
@@ -146,18 +254,26 @@ class _DashboardContent extends StatelessWidget {
 }
 
 class _LocationStatus extends StatelessWidget {
-  const _LocationStatus({required this.location});
-  final CurrentLocation location;
+  const _LocationStatus({required this.data});
+  final RiskDashboardData data;
 
   @override
-  Widget build(BuildContext context) => Card(
-        child: ListTile(
-          leading: const Icon(Icons.location_on_outlined),
-          title: const Text('Current location available'),
-          subtitle: Text(
-              'Coordinates on file: ${location.latitude.toStringAsFixed(4)}, ${location.longitude.toStringAsFixed(4)}'),
-        ),
-      );
+  Widget build(BuildContext context) {
+    final fix = data.fix;
+    final accuracy = fix.accuracy;
+    return Card(
+      child: ListTile(
+        leading: const Icon(Icons.my_location),
+        title: const Text('Live GPS location sent to GeoShield'),
+        subtitle: Text([
+          '${data.storedLocation.latitude.toStringAsFixed(5)}, '
+              '${data.storedLocation.longitude.toStringAsFixed(5)}',
+          if (accuracy != null) 'Accuracy ${accuracy.toStringAsFixed(0)} m',
+          'Fix taken ${fix.timestamp.toLocal().toIso8601String().substring(11, 19)}',
+        ].join(' · ')),
+      ),
+    );
+  }
 }
 
 class _RiskFactorCard extends StatelessWidget {

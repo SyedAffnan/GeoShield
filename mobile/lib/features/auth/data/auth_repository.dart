@@ -8,6 +8,14 @@ class Session {
   bool get isTourist => role == 'TOURIST';
 }
 
+/// The account the backend created, as returned by `POST /api/v1/auth/register`
+/// (`RegisterResponse`). Registration issues no token, so the tourist still signs in.
+class RegisteredAccount {
+  const RegisteredAccount({required this.email, required this.role});
+  final String email;
+  final String role;
+}
+
 class AuthRepository {
   AuthRepository(this._client, this._storage);
   final GeoShieldApiClient _client;
@@ -20,6 +28,30 @@ class AuthRepository {
       return null;
     }
     return Session(role: role);
+  }
+
+  /// Creates a tourist account through the existing registration endpoint. The
+  /// backend assigns the role; the client never sends or chooses one.
+  Future<RegisteredAccount> register({
+    required String username,
+    required String email,
+    required String password,
+    required String fullName,
+    required String phoneNumber,
+  }) async {
+    final data = await _client.postData('/api/v1/auth/register', data: {
+      'username': username,
+      'email': email,
+      'password': password,
+      'fullName': fullName,
+      'phoneNumber': phoneNumber,
+    });
+    final registeredEmail = data['email'] as String?;
+    final role = data['role'] as String?;
+    if (registeredEmail == null || role == null) {
+      throw StateError('The server returned an incomplete registration result.');
+    }
+    return RegisteredAccount(email: registeredEmail, role: role);
   }
 
   Future<Session> login(

@@ -5,6 +5,9 @@ abstract interface class SecureSessionStorage {
   Future<String?> readAccessToken();
   Future<String?> readRole();
   Future<void> save({required String accessToken, required String role});
+  Future<String?> readBackendBaseUrl();
+  Future<void> saveBackendBaseUrl(String baseUrl);
+  Future<void> clearBackendBaseUrl();
   Future<void> clear();
 }
 
@@ -14,6 +17,7 @@ class FlutterSecureSessionStorage implements SecureSessionStorage {
 
   static const _accessTokenKey = 'geoshield.access_token';
   static const _roleKey = 'geoshield.role';
+  static const _backendBaseUrlKey = 'geoshield.backend_base_url';
   final FlutterSecureStorage _storage;
 
   @override
@@ -29,5 +33,20 @@ class FlutterSecureSessionStorage implements SecureSessionStorage {
   }
 
   @override
-  Future<void> clear() => _storage.deleteAll();
+  Future<String?> readBackendBaseUrl() =>
+      _storage.read(key: _backendBaseUrlKey);
+
+  @override
+  Future<void> saveBackendBaseUrl(String baseUrl) =>
+      _storage.write(key: _backendBaseUrlKey, value: baseUrl);
+
+  @override
+  Future<void> clearBackendBaseUrl() =>
+      _storage.delete(key: _backendBaseUrlKey);
+
+  @override
+  Future<void> clear() async {
+    await _storage.delete(key: _accessTokenKey);
+    await _storage.delete(key: _roleKey);
+  }
 }

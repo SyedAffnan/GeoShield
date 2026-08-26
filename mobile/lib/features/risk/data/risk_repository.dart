@@ -1,22 +1,6 @@
+import '../../../core/location/device_location_service.dart';
 import '../../../core/network/api_client.dart';
-import '../../../core/network/auth_exception.dart';
-
-class CurrentLocation {
-  const CurrentLocation(
-      {required this.latitude,
-      required this.longitude,
-      required this.timestamp});
-  final double latitude;
-  final double longitude;
-  final DateTime? timestamp;
-
-  factory CurrentLocation.fromJson(Map<String, dynamic> json) =>
-      CurrentLocation(
-        latitude: (json['latitude'] as num).toDouble(),
-        longitude: (json['longitude'] as num).toDouble(),
-        timestamp: DateTime.tryParse(json['timestamp'] as String? ?? ''),
-      );
-}
+import '../../location/data/location_repository.dart';
 
 class RiskFactor {
   const RiskFactor({
@@ -64,31 +48,55 @@ class RiskResult {
       );
 }
 
+/// The device fix that was submitted, the location the backend stored for it, and
+/// the backend's authoritative risk response.
 class RiskDashboardData {
-  const RiskDashboardData({required this.location, required this.risk});
-  final CurrentLocation location;
+  const RiskDashboardData(
+      {required this.fix, required this.storedLocation, required this.risk});
+  final DeviceLocationFix fix;
+  final CurrentLocation storedLocation;
   final RiskResult risk;
 }
 
-class LocationUnavailableException implements Exception {
-  const LocationUnavailableException();
+/// Which step of the GPS -> backend -> risk flow is currently running.
+enum RiskDashboardStep { obtainingLocation, sendingLocation, loadingRisk }
+
+enum RiskDashboardFailureKind { session, network, serverRejected }
+
+sealed class RiskDashboardState {
+  const RiskDashboardState();
+}
+
+final class RiskDashboardBusy extends RiskDashboardState {
+  const RiskDashboardBusy(this.step);
+  final RiskDashboardStep step;
+}
+
+/// No fix could be produced, so no risk request is made at all.
+final class RiskDashboardLocationBlocked extends RiskDashboardState {
+  const RiskDashboardLocationBlocked(this.reason);
+  final DeviceLocationFailureReason reason;
+}
+
+final class RiskDashboardFailed extends RiskDashboardState {
+  const RiskDashboardFailed(this.kind, {this.message});
+  final RiskDashboardFailureKind kind;
+
+  /// Server-authored message, when the backend rejected the request.
+  final String? message;
+}
+
+final class RiskDashboardReady extends RiskDashboardState {
+  const RiskDashboardReady(this.data);
+  final RiskDashboardData data;
 }
 
 class RiskRepository {
   RiskRepository(this._client);
   final GeoShieldApiClient _client;
 
-  Future<RiskDashboardData> loadDashboard() async {
-    final CurrentLocation location;
-    try {
-      location =
-          CurrentLocation.fromJson(await _client.getData('/api/v1/locations'));
-    } on AuthException {
-      rethrow;
-    } catch (_) {
-      throw const LocationUnavailableException();
-    }
-    final risk = RiskResult.fromJson(await _client.getData('/api/v1/risk'));
-    return RiskDashboardData(location: location, risk: risk);
-  }
+  /// Reads the backend's baseline risk for the authenticated tourist. The score,
+  /// risk level, recommendation, and factor explanations are entirely server-computed.
+  Future<RiskResult> getCurrentRisk() async =>
+      RiskResult.fromJson(await _client.getData('/api/v1/risk'));
 }

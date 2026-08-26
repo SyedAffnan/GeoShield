@@ -2,7 +2,9 @@ import 'package:dio/dio.dart';
 
 import '../storage/secure_session_storage.dart';
 import 'auth_exception.dart';
+import 'conflict_exception.dart';
 import 'network_exception.dart';
+import 'validation_exception.dart';
 
 abstract class ApiClient {
   Dio get dio;
@@ -11,15 +13,39 @@ abstract class ApiClient {
 /// HTTP client for the Spring Boot API. It never logs credentials or tokens.
 class GeoShieldApiClient implements ApiClient {
   GeoShieldApiClient(this._sessionStorage, {Dio? dio})
-      : _dio = dio ?? Dio(BaseOptions(baseUrl: _defaultBaseUrl));
+      : _dio = dio ?? Dio(BaseOptions(baseUrl: defaultBaseUrl));
 
-  static const _defaultBaseUrl = String.fromEnvironment(
+  /// Compile-time override retained for emulator, CI, and developer workflows.
+  static const defaultBaseUrl = String.fromEnvironment(
     'GEOSHIELD_API_BASE_URL',
     defaultValue: 'http://10.0.2.2:8080',
   );
 
   final SecureSessionStorage _sessionStorage;
   final Dio _dio;
+
+  String get baseUrl => _dio.options.baseUrl;
+
+  /// Changes only the host origin. Repository paths continue to own `/api/v1`.
+  void setBaseUrl(String baseUrl) {
+    _dio.options.baseUrl = normalizeBaseUrl(baseUrl);
+  }
+
+  static String normalizeBaseUrl(String value) {
+    final uri = Uri.tryParse(value.trim());
+    if (uri == null ||
+        (uri.scheme != 'http' && uri.scheme != 'https') ||
+        uri.host.isEmpty ||
+        uri.userInfo.isNotEmpty ||
+        (uri.path.isNotEmpty && uri.path != '/') ||
+        uri.hasQuery ||
+        uri.hasFragment) {
+      throw const FormatException(
+        'Enter a server URL such as http://192.168.0.13:8080 without an API path.',
+      );
+    }
+    return uri.replace(path: '', query: null, fragment: null).toString();
+  }
 
   @override
   Dio get dio {
@@ -76,7 +102,26 @@ class GeoShieldApiClient implements ApiClient {
       return const AuthException(
           'Your session is no longer valid. Please sign in again.');
     }
+    if (statusCode == 409) {
+      return ConflictException(_serverMessage(error) ??
+          'An account with those details already exists.');
+    }
+    if (statusCode == 400) {
+      return ValidationException(
+          _serverMessage(error) ?? 'The server rejected the submitted values.');
+    }
     return const NetworkException('Unable to reach the GeoShield service.');
+  }
+
+  /// Reads the `message` field of the backend `ApiError` envelope so server-authored
+  /// validation text can be shown. Request bodies are never read back or logged.
+  String? _serverMessage(DioException error) {
+    final body = error.response?.data;
+    if (body is Map && body['message'] is String) {
+      final message = body['message'] as String;
+      return message.isEmpty ? null : message;
+    }
+    return null;
   }
 }
 

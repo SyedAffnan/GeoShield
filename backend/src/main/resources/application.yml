@@ -21,6 +21,7 @@ spring:
     time-zone: UTC
 
 server:
+  address: 0.0.0.0
   forward-headers-strategy: framework
   error:
     include-message: never

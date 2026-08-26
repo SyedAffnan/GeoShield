@@ -1,7 +1,7 @@
 import 'package:uuid/uuid.dart';
 
 import '../../../core/network/api_client.dart';
-import '../../risk/data/risk_repository.dart';
+import '../../location/data/location_repository.dart';
 
 class Incident {
   const Incident(
