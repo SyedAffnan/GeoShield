@@ -12,4 +12,5 @@ public interface LocationService extends ModuleService {
     LocationResponse submitLocation(UUID userId, LocationRequest request);
     LocationResponse getCurrentLocation(UUID userId);
     List<LocationResponse> getLocationHistory(UUID userId);
+    long getTotalLocationCount();
 }

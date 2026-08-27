@@ -24,7 +24,15 @@ class SessionGate extends ConsumerWidget {
           context, 'Unable to restore your session. Please sign in again.'),
       data: (value) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          context.go(value?.isTourist == true ? '/dashboard' : '/login');
+          if (value == null) {
+            context.go('/login');
+          } else if (value.isAdmin) {
+            context.go('/admin');
+          } else if (value.isResponder) {
+            context.go('/responder');
+          } else {
+            context.go('/dashboard');
+          }
         });
         return const Scaffold(body: Center(child: CircularProgressIndicator()));
       },

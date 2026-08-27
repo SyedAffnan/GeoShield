@@ -4,14 +4,123 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/di/providers.dart';
 import '../../../core/location/device_location_service.dart';
+import '../../../core/network/auth_exception.dart';
+import '../../../core/network/network_exception.dart';
+import '../../sos/data/sos_repository.dart';
 import '../data/risk_repository.dart';
 
-class RiskDashboardScreen extends ConsumerWidget {
+class RiskDashboardScreen extends ConsumerStatefulWidget {
   const RiskDashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<RiskDashboardScreen> createState() =>
+      _RiskDashboardScreenState();
+}
+
+class _RiskDashboardScreenState extends ConsumerState<RiskDashboardScreen> {
+  bool _sosSending = false;
+  String? _sosError;
+
+  /// Shows confirmation dialog, obtains GPS location, and creates the SOS.
+  ///
+  /// Rules enforced:
+  ///   1. Requires a valid GPS fix — never sends 0,0 or fake coordinates.
+  ///   2. Shows a confirmation dialog before any network request is made.
+  ///   3. Navigates to SosStatusScreen on success so the tourist tracks progress.
+  ///   4. Shows a clear inline error on failure.
+  Future<void> _triggerSos() async {
+    // Step 1 — confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        icon: Icon(Icons.sos_rounded,
+            size: 40, color: Theme.of(context).colorScheme.error),
+        title: const Text('Send Emergency SOS?'),
+        content: const Text(
+          'This will send your current GPS location to GeoShield emergency '
+          'responders immediately.\n\n'
+          'Only use this in a genuine emergency.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error),
+            child: const Text('Send SOS'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _sosSending = true;
+      _sosError = null;
+    });
+
+    try {
+      // Step 2 — obtain real GPS fix
+      final locationResult =
+          await ref.read(deviceLocationServiceProvider).currentPosition();
+      if (!mounted) return;
+      if (locationResult is DeviceLocationFailure) {
+        setState(() {
+          _sosSending = false;
+          _sosError = switch (locationResult.reason) {
+            DeviceLocationFailureReason.servicesDisabled =>
+              'Location services are disabled. Enable GPS and try again.',
+            DeviceLocationFailureReason.permissionDenied ||
+            DeviceLocationFailureReason.permissionDeniedForever =>
+              'Location permission is required to send an SOS.',
+            _ =>
+              'Could not determine your current location. Move to an open area and try again.',
+          };
+        });
+        return;
+      }
+      final fix = locationResult as DeviceLocationFix;
+
+      // Step 3 — create SOS using the existing backend API
+      final alert = await ref.read(sosRepositoryProvider).createSos(
+            latitude: fix.latitude,
+            longitude: fix.longitude,
+            clientRequestId: generateClientRequestId(),
+          );
+      if (!mounted) return;
+
+      setState(() => _sosSending = false);
+      // Navigate to the SOS status screen with the alert as GoRouter extra
+      if (mounted) context.push('/sos', extra: alert);
+    } on AuthException {
+      if (!mounted) return;
+      setState(() {
+        _sosSending = false;
+        _sosError = 'Session expired. Please sign in again.';
+      });
+    } on NetworkException {
+      if (!mounted) return;
+      setState(() {
+        _sosSending = false;
+        _sosError = 'Unable to reach GeoShield. Check your connection and try again.';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _sosSending = false;
+        _sosError = 'SOS failed: ${e.toString()}';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, ) {
     final state = ref.watch(riskDashboardProvider);
+    final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: const Text('GeoShield Safety'),
@@ -39,14 +148,70 @@ class RiskDashboardScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: switch (state) {
-        RiskDashboardBusy(step: final step) => _Busy(step: step),
-        RiskDashboardLocationBlocked(reason: final reason) =>
-          _LocationBlocked(reason: reason),
-        RiskDashboardFailed(kind: final kind, message: final message) =>
-          _RequestFailed(kind: kind, message: message),
-        RiskDashboardReady(data: final data) => _DashboardContent(data: data),
-      },
+      // Prominent red SOS FAB — always visible regardless of dashboard state
+      floatingActionButton: _sosSending
+          ? FloatingActionButton.extended(
+              onPressed: null,
+              backgroundColor: colorScheme.error,
+              foregroundColor: colorScheme.onError,
+              icon: const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: Colors.white),
+              ),
+              label: const Text('Sending SOS…'),
+            )
+          : FloatingActionButton.extended(
+              onPressed: _triggerSos,
+              backgroundColor: colorScheme.error,
+              foregroundColor: colorScheme.onError,
+              icon: const Icon(Icons.sos_rounded),
+              label: const Text(
+                'SOS',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              tooltip: 'Send emergency SOS to responders',
+            ),
+      body: Column(
+        children: [
+          if (_sosError != null)
+            Material(
+              color: colorScheme.errorContainer,
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded,
+                        color: colorScheme.onErrorContainer),
+                    const SizedBox(width: 8),
+                    Expanded(
+                        child: Text(_sosError!,
+                            style: TextStyle(
+                                color: colorScheme.onErrorContainer))),
+                    IconButton(
+                      icon: Icon(Icons.close,
+                          color: colorScheme.onErrorContainer),
+                      onPressed: () => setState(() => _sosError = null),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          Expanded(
+            child: switch (state) {
+              RiskDashboardBusy(step: final step) => _Busy(step: step),
+              RiskDashboardLocationBlocked(reason: final reason) =>
+                _LocationBlocked(reason: reason),
+              RiskDashboardFailed(kind: final kind, message: final message) =>
+                _RequestFailed(kind: kind, message: message),
+              RiskDashboardReady(data: final data) =>
+                _DashboardContent(data: data),
+            },
+          ),
+        ],
+      ),
     );
   }
 }

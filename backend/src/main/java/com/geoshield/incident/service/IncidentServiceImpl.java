@@ -1,12 +1,14 @@
 package com.geoshield.incident.service;
 
 import com.geoshield.common.exception.ConflictException;
+import com.geoshield.common.exception.InvalidStateTransitionException;
 import com.geoshield.common.exception.ResourceNotFoundException;
 import com.geoshield.identity.entity.User;
 import com.geoshield.identity.service.IdentityService;
 import com.geoshield.incident.dto.CreateIncidentRequest;
 import com.geoshield.incident.dto.IncidentCreationResult;
 import com.geoshield.incident.dto.IncidentResponse;
+import com.geoshield.incident.dto.ResponderIncidentResponse;
 import com.geoshield.incident.entity.Incident;
 import com.geoshield.incident.entity.IncidentSourceType;
 import com.geoshield.incident.mapper.IncidentMapper;
@@ -66,6 +68,65 @@ public class IncidentServiceImpl implements IncidentService {
         Incident incident = incidentRepository.findByIdAndReporterId(incidentId, reporterId)
                 .orElseThrow(() -> new ResourceNotFoundException("Incident not found"));
         return toVerifiedResponse(incident);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ResponderIncidentResponse> getActiveIncidentQueue() {
+        return incidentRepository.findAllByStatusInOrderByCreatedAtDesc(List.of("REPORTED", "ACKNOWLEDGED", "RESPONDING"))
+                .stream()
+                .map(this::toVerifiedResponderResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResponderIncidentResponse getIncidentForResponder(UUID incidentId) {
+        Incident incident = incidentRepository.findById(incidentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Incident not found"));
+        return toVerifiedResponderResponse(incident);
+    }
+
+    @Override
+    @Transactional
+    public ResponderIncidentResponse updateIncidentStatus(UUID incidentId, String newStatus, UUID responderId) {
+        Incident incident = incidentRepository.findById(incidentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Incident not found"));
+
+        validateStatusTransition(incident.getStatus(), newStatus);
+        incident.setStatus(newStatus);
+        return toVerifiedResponderResponse(incidentRepository.save(incident));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ResponderIncidentResponse> getAllIncidentsForAdmin() {
+        return incidentRepository.findAllByOrderByCreatedAtDesc()
+                .stream()
+                .map(this::toVerifiedResponderResponse)
+                .toList();
+    }
+
+    private void validateStatusTransition(String currentStatus, String newStatus) {
+        if (currentStatus.equalsIgnoreCase(newStatus)) {
+            return;
+        }
+        boolean valid = switch (currentStatus.toUpperCase()) {
+            case "REPORTED" -> newStatus.equalsIgnoreCase("ACKNOWLEDGED") || newStatus.equalsIgnoreCase("CANCELLED");
+            case "ACKNOWLEDGED" -> newStatus.equalsIgnoreCase("RESPONDING") || newStatus.equalsIgnoreCase("CANCELLED");
+            case "RESPONDING" -> newStatus.equalsIgnoreCase("RESOLVED");
+            default -> false;
+        };
+        if (!valid) {
+            throw new InvalidStateTransitionException("Cannot transition incident status from " + currentStatus + " to " + newStatus);
+        }
+    }
+
+    private ResponderIncidentResponse toVerifiedResponderResponse(Incident incident) {
+        if (!integrityHasher.matches(incident)) {
+            throw new ConflictException("Incident integrity verification failed");
+        }
+        return incidentMapper.toResponderResponse(incident);
     }
 
     private IncidentResponse toVerifiedResponse(Incident incident) {

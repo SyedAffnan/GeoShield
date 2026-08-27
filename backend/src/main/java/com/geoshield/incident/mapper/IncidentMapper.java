@@ -2,6 +2,7 @@ package com.geoshield.incident.mapper;
 
 import com.geoshield.incident.dto.CreateIncidentRequest;
 import com.geoshield.incident.dto.IncidentResponse;
+import com.geoshield.incident.dto.ResponderIncidentResponse;
 import com.geoshield.incident.entity.Incident;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -19,4 +20,11 @@ public interface IncidentMapper {
     @Mapping(target = "incidentId", source = "id")
     @Mapping(target = "reportedAt", source = "createdAt")
     IncidentResponse toResponse(Incident incident);
+
+    @Mapping(target = "incidentId", source = "id")
+    @Mapping(target = "reporterId", source = "reporter.id")
+    @Mapping(target = "reporterUsername", source = "reporter.username")
+    @Mapping(target = "reporterFullName", source = "reporter.fullName")
+    @Mapping(target = "reporterPhoneNumber", source = "reporter.phoneNumber")
+    ResponderIncidentResponse toResponderResponse(Incident incident);
 }

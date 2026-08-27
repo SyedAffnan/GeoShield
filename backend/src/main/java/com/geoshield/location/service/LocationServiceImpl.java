@@ -61,4 +61,10 @@ public class LocationServiceImpl implements LocationService {
     public List<LocationResponse> getLocationHistory(UUID userId) {
         return routeHistoryRepository.findAllByUserIdOrderByStartedAtAsc(userId).stream().map(locationMapper::toResponse).toList();
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long getTotalLocationCount() {
+        return routeHistoryRepository.count();
+    }
 }

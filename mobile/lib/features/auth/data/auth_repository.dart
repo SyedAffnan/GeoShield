@@ -6,6 +6,8 @@ class Session {
   final String role;
 
   bool get isTourist => role == 'TOURIST';
+  bool get isAdmin => role == 'ADMIN';
+  bool get isResponder => role == 'RESPONDER';
 }
 
 /// The account the backend created, as returned by `POST /api/v1/auth/register`

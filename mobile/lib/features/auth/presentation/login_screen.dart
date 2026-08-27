@@ -36,17 +36,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             password: _passwordController.text,
           );
       if (!mounted) return;
-      if (!session.isTourist) {
-        // The backend exposes no ADMIN or RESPONDER endpoints, so there is no
-        // privileged dashboard to route to. The session is discarded rather than
-        // shown a tourist screen it is not authorized for.
-        await ref.read(authControllerProvider.notifier).logout();
-        setState(() => _error =
-            'The GeoShield backend currently exposes no ${session.role} features. '
-            'Sign in with a tourist account to view the safety dashboard.');
-        return;
+      if (session.isAdmin) {
+        context.go('/admin');
+      } else if (session.isResponder) {
+        context.go('/responder');
+      } else {
+        context.go('/dashboard');
       }
-      context.go('/dashboard');
     } on AuthException {
       if (mounted) {
         setState(() => _error = 'Email or password is incorrect.');
@@ -61,6 +57,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         setState(() => _error = 'Unable to sign in. Please try again.');
       }
     }
+  }
+
+  void _fillDemoCredentials(String email, String password) {
+    _emailController.text = email;
+    _passwordController.text = password;
+    setState(() => _error = null);
   }
 
   @override
@@ -81,78 +83,123 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 420),
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text('GeoShield',
-                          style: Theme.of(context).textTheme.headlineMedium),
-                      const SizedBox(height: 8),
-                      Text('Tourist Safety Dashboard',
-                          style: Theme.of(context).textTheme.titleMedium),
-                      const SizedBox(height: 28),
-                      TextFormField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        autocorrect: false,
-                        decoration: const InputDecoration(
-                            labelText: 'Email', border: OutlineInputBorder()),
-                        validator: (value) =>
-                            value == null || !value.contains('@')
-                                ? 'Enter a valid email address.'
-                                : null,
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _passwordController,
-                        obscureText: _obscurePassword,
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          border: const OutlineInputBorder(),
-                          suffixIcon: IconButton(
-                            onPressed: () => setState(
-                                () => _obscurePassword = !_obscurePassword),
-                            icon: Icon(_obscurePassword
-                                ? Icons.visibility
-                                : Icons.visibility_off),
+            child: Column(
+              children: [
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text('GeoShield',
+                              style: Theme.of(context).textTheme.headlineMedium),
+                          const SizedBox(height: 8),
+                          Text('Safety & Emergency Response',
+                              style: Theme.of(context).textTheme.titleMedium),
+                          const SizedBox(height: 28),
+                          TextFormField(
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            autocorrect: false,
+                            decoration: const InputDecoration(
+                                labelText: 'Email', border: OutlineInputBorder()),
+                            validator: (value) =>
+                                value == null || !value.contains('@')
+                                    ? 'Enter a valid email address.'
+                                    : null,
                           ),
-                        ),
-                        validator: (value) => value == null || value.isEmpty
-                            ? 'Enter your password.'
-                            : null,
-                        onFieldSubmitted: (_) => _login(),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _passwordController,
+                            obscureText: _obscurePassword,
+                            decoration: InputDecoration(
+                              labelText: 'Password',
+                              border: const OutlineInputBorder(),
+                              suffixIcon: IconButton(
+                                onPressed: () => setState(
+                                    () => _obscurePassword = !_obscurePassword),
+                                icon: Icon(_obscurePassword
+                                    ? Icons.visibility
+                                    : Icons.visibility_off),
+                              ),
+                            ),
+                            validator: (value) => value == null || value.isEmpty
+                                ? 'Enter your password.'
+                                : null,
+                            onFieldSubmitted: (_) => _login(),
+                          ),
+                          if (_error != null) ...[
+                            const SizedBox(height: 16),
+                            Text(_error!,
+                                style: TextStyle(
+                                    color: Theme.of(context).colorScheme.error)),
+                          ],
+                          const SizedBox(height: 24),
+                          FilledButton(
+                            onPressed: isLoading ? null : _login,
+                            child: isLoading
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child:
+                                        CircularProgressIndicator(strokeWidth: 2))
+                                : const Text('Sign in'),
+                          ),
+                          const SizedBox(height: 8),
+                          TextButton(
+                            onPressed:
+                                isLoading ? null : () => context.push('/register'),
+                            child: const Text('New tourist? Create account'),
+                          ),
+                        ],
                       ),
-                      if (_error != null) ...[
-                        const SizedBox(height: 16),
-                        Text(_error!,
-                            style: TextStyle(
-                                color: Theme.of(context).colorScheme.error)),
-                      ],
-                      const SizedBox(height: 24),
-                      FilledButton(
-                        onPressed: isLoading ? null : _login,
-                        child: isLoading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2))
-                            : const Text('Sign in'),
-                      ),
-                      const SizedBox(height: 8),
-                      TextButton(
-                        onPressed:
-                            isLoading ? null : () => context.push('/register'),
-                        child: const Text('New to GeoShield? Create account'),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
+                const SizedBox(height: 16),
+                Card(
+                  elevation: 0,
+                  color: Theme.of(context)
+                      .colorScheme
+                      .surfaceContainerHighest
+                      .withValues(alpha: 0.4),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Demo Quick Fill',
+                          style: Theme.of(context).textTheme.labelLarge,
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            ActionChip(
+                              avatar: const Icon(Icons.admin_panel_settings,
+                                  size: 16),
+                              label: const Text('Admin'),
+                              onPressed: () => _fillDemoCredentials(
+                                  'admin@geoshield.com', 'Admin@123456'),
+                            ),
+                            ActionChip(
+                              avatar: const Icon(Icons.medical_services,
+                                  size: 16),
+                              label: const Text('Responder'),
+                              onPressed: () => _fillDemoCredentials(
+                                  'responder@geoshield.com', 'Responder@123456'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),

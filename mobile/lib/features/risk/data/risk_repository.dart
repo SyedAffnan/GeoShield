@@ -98,5 +98,5 @@ class RiskRepository {
   /// Reads the backend's baseline risk for the authenticated tourist. The score,
   /// risk level, recommendation, and factor explanations are entirely server-computed.
   Future<RiskResult> getCurrentRisk() async =>
-      RiskResult.fromJson(await _client.getData('/api/v1/risk'));
+      RiskResult.fromJson(await _client.getData('/api/v1/risk') as Map<String, dynamic>);
 }

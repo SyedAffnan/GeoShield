@@ -22,6 +22,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.geoshield.identity.dto.ProvisionUserRequest;
+import com.geoshield.identity.dto.UserSummaryResponse;
+import java.util.List;
+import java.util.Map;
+
 @Service
 public class IdentityServiceImpl implements IdentityService {
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
@@ -54,6 +59,53 @@ public class IdentityServiceImpl implements IdentityService {
         User user = new User(request.username(), request.email(), passwordEncoder.encode(request.password()),
                 request.fullName(), request.phoneNumber(), touristRole);
         return userMapper.toRegisterResponse(userRepository.save(user));
+    }
+
+    @Override
+    @Transactional
+    public UserSummaryResponse provisionUser(ProvisionUserRequest request) {
+        if (request.role() == Role.TOURIST) {
+            throw new ConflictException("Privileged provisioning cannot create tourist accounts. Use public registration.");
+        }
+        if (userRepository.existsByUsername(request.username())) {
+            throw new ConflictException("Username is already in use");
+        }
+        if (userRepository.existsByEmail(request.email())) {
+            throw new ConflictException("Email is already in use");
+        }
+        UserRole targetRole = roleRepository.findByName(request.role())
+                .orElseThrow(() -> new ResourceNotFoundException("Role is not configured: " + request.role()));
+        User user = new User(request.username(), request.email(), passwordEncoder.encode(request.password()),
+                request.fullName(), request.phoneNumber(), targetRole);
+        return userMapper.toUserSummaryResponse(userRepository.save(user));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<UserSummaryResponse> listUsers(Role roleFilter) {
+        List<User> users = (roleFilter == null)
+                ? userRepository.findAllByOrderByCreatedAtDesc()
+                : userRepository.findAllByRoleNameOrderByCreatedAtDesc(roleFilter);
+        return users.stream().map(userMapper::toUserSummaryResponse).toList();
+    }
+
+    @Override
+    @Transactional
+    public UserSummaryResponse updateUserStatus(java.util.UUID userId, boolean active) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        user.setActive(active);
+        return userMapper.toUserSummaryResponse(userRepository.save(user));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<Role, Long> getUserCountsByRole() {
+        return Map.of(
+                Role.TOURIST, userRepository.countByRoleName(Role.TOURIST),
+                Role.RESPONDER, userRepository.countByRoleName(Role.RESPONDER),
+                Role.ADMIN, userRepository.countByRoleName(Role.ADMIN)
+        );
     }
 
     @Override

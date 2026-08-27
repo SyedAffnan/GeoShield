@@ -41,5 +41,5 @@ class LocationRepository {
 
   /// Reads the location already stored for the authenticated tourist.
   Future<CurrentLocation> getCurrentLocation() async =>
-      CurrentLocation.fromJson(await _client.getData('/api/v1/locations'));
+      CurrentLocation.fromJson(await _client.getData('/api/v1/locations') as Map<String, dynamic>);
 }

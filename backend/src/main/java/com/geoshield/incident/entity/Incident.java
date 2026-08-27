@@ -80,4 +80,5 @@ public class Incident extends BaseEntity {
     public void setDescription(String description) { this.description = description; }
     public void setLatitude(BigDecimal latitude) { this.latitude = latitude; }
     public void setLongitude(BigDecimal longitude) { this.longitude = longitude; }
+    public void setStatus(String status) { this.status = status; }
 }

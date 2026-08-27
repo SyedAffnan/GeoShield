@@ -93,6 +93,8 @@ public class User extends BaseEntity {
         this.refreshTokenExpiresAt = refreshTokenExpiresAt;
     }
 
+    public void setActive(boolean active) { this.active = active; }
+
     public void updateProfile(String fullName, String phoneNumber, java.time.LocalDate dateOfBirth, String gender,
             String nationality, String address, String profileImageUrl) {
         this.fullName = fullName;

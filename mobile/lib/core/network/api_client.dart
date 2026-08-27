@@ -55,10 +55,13 @@ class GeoShieldApiClient implements ApiClient {
     return _dio;
   }
 
-  Future<Map<String, dynamic>> getData(String path) async {
+  Future<dynamic> getData(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+  }) async {
     try {
-      final response = await dio.get<dynamic>(path);
-      return _data(response.data);
+      final response = await dio.get<dynamic>(path, queryParameters: queryParameters);
+      return _rawData(response.data);
     } on DioException catch (error) {
       throw _toException(error);
     }
@@ -70,7 +73,19 @@ class GeoShieldApiClient implements ApiClient {
   }) async {
     try {
       final response = await dio.post<dynamic>(path, data: data);
-      return _data(response.data);
+      return _mapData(response.data);
+    } on DioException catch (error) {
+      throw _toException(error);
+    }
+  }
+
+  Future<Map<String, dynamic>> patchData(
+    String path, {
+    required Map<String, dynamic> data,
+  }) async {
+    try {
+      final response = await dio.patch<dynamic>(path, data: data);
+      return _mapData(response.data);
     } on DioException catch (error) {
       throw _toException(error);
     }
@@ -89,7 +104,15 @@ class GeoShieldApiClient implements ApiClient {
     }
   }
 
-  Map<String, dynamic> _data(dynamic responseBody) {
+  dynamic _rawData(dynamic responseBody) {
+    if (responseBody is Map<String, dynamic>) {
+      final data = responseBody['data'];
+      if (data != null) return data;
+    }
+    throw const NetworkException('Unexpected server response.');
+  }
+
+  Map<String, dynamic> _mapData(dynamic responseBody) {
     if (responseBody is Map<String, dynamic> && responseBody['data'] is Map) {
       return Map<String, dynamic>.from(responseBody['data'] as Map);
     }

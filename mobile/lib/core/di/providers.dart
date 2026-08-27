@@ -2,10 +2,13 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../features/admin/data/admin_repository.dart';
 import '../../features/auth/data/auth_repository.dart';
 import '../../features/incidents/data/incident_repository.dart';
 import '../../features/location/data/location_repository.dart';
+import '../../features/responder/data/responder_repository.dart';
 import '../../features/risk/data/risk_repository.dart';
+import '../../features/sos/data/sos_repository.dart';
 import '../location/device_location_service.dart';
 import '../network/api_client.dart';
 import '../network/api_configuration.dart';
@@ -160,4 +163,16 @@ final incidentRepositoryProvider = Provider<IncidentRepository>((ref) {
 
 final incidentsProvider = FutureProvider.autoDispose<List<Incident>>((ref) {
   return ref.watch(incidentRepositoryProvider).getIncidents();
+});
+
+final adminRepositoryProvider = Provider<AdminRepository>((ref) {
+  return AdminRepository(ref.watch(apiClientProvider));
+});
+
+final responderRepositoryProvider = Provider<ResponderRepository>((ref) {
+  return ResponderRepository(ref.watch(apiClientProvider));
+});
+
+final sosRepositoryProvider = Provider<SosRepository>((ref) {
+  return SosRepository(ref.watch(apiClientProvider));
 });
