@@ -107,6 +107,15 @@ public class IncidentServiceImpl implements IncidentService {
                 .toList();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<IncidentResponse> getActiveIncidents() {
+        return incidentRepository.findAllByStatusInOrderByCreatedAtDesc(List.of("REPORTED", "ACKNOWLEDGED", "RESPONDING"))
+                .stream()
+                .map(this::toVerifiedResponse)
+                .toList();
+    }
+
     private void validateStatusTransition(String currentStatus, String newStatus) {
         if (currentStatus.equalsIgnoreCase(newStatus)) {
             return;

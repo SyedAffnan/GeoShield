@@ -15,6 +15,8 @@ import com.geoshield.historicaldata.entity.GeographicLevel;
 import com.geoshield.historicaldata.service.HistoricalDataService;
 import com.geoshield.identity.entity.User;
 import com.geoshield.identity.service.IdentityService;
+import com.geoshield.incident.dto.IncidentResponse;
+import com.geoshield.incident.entity.IncidentSourceType;
 import com.geoshield.incident.service.IncidentService;
 import com.geoshield.location.dto.LocationResponse;
 import com.geoshield.location.service.LocationService;
@@ -104,7 +106,7 @@ class GeographicHistoricalRiskIntegrationTest {
         userId = UUID.randomUUID();
         assembler = assemblerObserving(WeatherObservationResult.observed(
                 new WeatherObservation(PROVIDER, OBSERVED_WMO_CODE, FIXED_INSTANT)));
-        lenient().when(incidentService.getIncidents(userId)).thenReturn(List.of());
+        lenient().when(incidentService.getActiveIncidents()).thenReturn(List.of());
         lenient().when(identityService.getUserById(userId)).thenReturn(user);
     }
 
@@ -117,7 +119,7 @@ class GeographicHistoricalRiskIntegrationTest {
         return new RiskContextAssembler(locationService, incidentService,
                 new BoundaryGeographicResolutionService(boundaryIndex),
                 new HistoricalRiskFeatureService(historicalDataService),
-                new IncidentRiskFeatureService(),
+                new IncidentRiskFeatureService(Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC)),
                 new TimeOfDayRiskService(Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                         new MorthTimeOfDayDistribution()),
                 new WeatherRiskService(new FixedWeatherObservationProvider(weather),
@@ -202,17 +204,53 @@ class GeographicHistoricalRiskIntegrationTest {
         assertEquals(0, weather.normalizedRisk().compareTo(WEATHER_NORMALIZED));
         assertEquals(0, weather.contribution().compareTo(new BigDecimal("15.8133980780")));
 
-        // Every remaining factor stays explicitly unavailable and contributes exactly zero.
+        var userReport = result.contributingFactors().stream()
+                .filter(factor -> factor.factor() == RiskFactorType.USER_REPORT).findFirst().orElseThrow();
+        assertTrue(userReport.available());
+        assertEquals(0, userReport.weight().compareTo(new BigDecimal("0.10")));
+        assertEquals(0, userReport.normalizedRisk().compareTo(BigDecimal.ZERO));
+        assertEquals(0, userReport.contribution().compareTo(BigDecimal.ZERO));
+
+        // The remaining 3 factors stay explicitly unavailable and contribute exactly zero.
         assertTrue(result.contributingFactors().stream()
                 .filter(factor -> factor.factor() != RiskFactorType.HISTORICAL_INCIDENT
                         && factor.factor() != RiskFactorType.TIME_OF_DAY
-                        && factor.factor() != RiskFactorType.WEATHER)
+                        && factor.factor() != RiskFactorType.WEATHER
+                        && factor.factor() != RiskFactorType.USER_REPORT)
                 .allMatch(factor -> !factor.available() && factor.normalizedRisk() == null
                         && factor.contribution().signum() == 0));
 
         ArgumentCaptor<RiskScore> saved = ArgumentCaptor.forClass(RiskScore.class);
         verify(riskScoreRepository).save(saved.capture());
         assertEquals(43, saved.getValue().getScore());
+    }
+
+    @Test
+    void producesIncreasedRiskScoreWhenActiveNearbyIncidentExists() {
+        storedLocationIs(LATITUDE, LONGITUDE);
+        morthPerLakhRecordsAreAvailable();
+
+        // 1 active Road hazard directly at tourist location, reported 0h ago: severity 25 * 1.0 * 1.0 * 1.0 = 25.0
+        // Weight 0.10 -> contributes 2.50000000 points.
+        // Base score was 43.3828208150 + 2.50000000 = 45.8828208150.
+        IncidentResponse activeIncident = new IncidentResponse(UUID.randomUUID(), "Road hazard", "Active road hazard",
+                LATITUDE, LONGITUDE, "REPORTED", "a".repeat(64), IncidentSourceType.USER_REPORTED, FIXED_INSTANT);
+        when(incidentService.getActiveIncidents()).thenReturn(List.of(activeIncident));
+
+        var fusion = new BaselineRiskFusionService(approvedProperties(), identityService,
+                riskScoreRepository, new ObjectMapper());
+
+        BaselineRiskResult result = fusion.calculateBaselineRisk(assembler.assembleForCurrentUser(userId));
+
+        assertEquals(0, result.score().compareTo(new BigDecimal("45.8828208150")));
+        assertEquals(RiskLevel.MEDIUM, result.riskLevel());
+
+        var userReport = result.contributingFactors().stream()
+                .filter(factor -> factor.factor() == RiskFactorType.USER_REPORT).findFirst().orElseThrow();
+        assertTrue(userReport.available());
+        assertEquals(0, userReport.weight().compareTo(new BigDecimal("0.10")));
+        assertEquals(0, userReport.normalizedRisk().compareTo(new BigDecimal("25.00000000")));
+        assertEquals(0, userReport.contribution().compareTo(new BigDecimal("2.50000000")));
     }
 
     @Test

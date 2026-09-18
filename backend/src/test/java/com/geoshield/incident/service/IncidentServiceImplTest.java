@@ -99,6 +99,19 @@ class IncidentServiceImplTest {
     }
 
     @Test
+    void retrievesActiveIncidentsMatchingActiveStatusesAndVerifiedIntegrity() {
+        Incident activeIncident = incident(request());
+        when(incidentRepository.findAllByStatusInOrderByCreatedAtDesc(List.of("REPORTED", "ACKNOWLEDGED", "RESPONDING")))
+                .thenReturn(List.of(activeIncident));
+
+        List<IncidentResponse> results = service.getActiveIncidents();
+
+        assertEquals(1, results.size());
+        assertEquals("Road hazard", results.getFirst().incidentType());
+        verify(incidentRepository).findAllByStatusInOrderByCreatedAtDesc(List.of("REPORTED", "ACKNOWLEDGED", "RESPONDING"));
+    }
+
+    @Test
     void doesNotExposeAnotherUsersIncident() {
         UUID otherUserId = UUID.randomUUID();
         UUID incidentId = UUID.randomUUID();

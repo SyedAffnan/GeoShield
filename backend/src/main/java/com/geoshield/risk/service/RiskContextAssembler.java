@@ -43,10 +43,11 @@ public class RiskContextAssembler {
     public BaselineRiskCalculationRequest assembleForCurrentUser(UUID userId) {
         // Enforces the approved precondition and avoids direct Location repository access.
         LocationResponse location = locationService.getCurrentLocation(userId);
-        List<IncidentResponse> userReports = incidentService.getIncidents(userId);
+        List<IncidentResponse> userReports = incidentService.getActiveIncidents();
         GeographicResolution resolution = geographicResolutionService.resolve(location.latitude(), location.longitude());
         NormalizedRiskFeature historical = historicalRiskFeatureService.historicalIncidentRisk(resolution);
-        NormalizedRiskFeature incidents = incidentRiskFeatureService.userReportRisk(userReports);
+        NormalizedRiskFeature incidents = incidentRiskFeatureService.userReportRisk(userReports, location.latitude(),
+                location.longitude());
         NormalizedRiskFeature timeOfDay = timeOfDayRiskService.currentRisk();
         // The coordinates go no further than the weather service boundary; the feature it returns
         // carries the observed condition, never the location it was observed for.

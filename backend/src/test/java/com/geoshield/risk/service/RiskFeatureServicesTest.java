@@ -51,7 +51,7 @@ class RiskFeatureServicesTest {
         var incident = new IncidentRiskFeatureService().userReportRisk(List.of(new IncidentResponse(UUID.randomUUID(), "Hazard",
                 "Description", BigDecimal.ONE, BigDecimal.ONE, "REPORTED", "a".repeat(64), IncidentSourceType.USER_REPORTED, Instant.now())));
         assertFalse(incident.available());
-        assertTrue(incident.reason().contains("normalization"));
+        assertTrue(incident.reason().contains("No current location is available"));
     }
 
     @Test

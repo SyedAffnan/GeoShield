@@ -39,11 +39,12 @@ class RiskContextAssemblerTest {
                 null, null, Instant.now()));
         List<IncidentResponse> incidents = List.of(new IncidentResponse(UUID.randomUUID(), "Road hazard", "Debris",
                 BigDecimal.ONE, BigDecimal.ONE, "REPORTED", "a".repeat(64), IncidentSourceType.USER_REPORTED, Instant.now()));
-        when(incidentService.getIncidents(userId)).thenReturn(incidents);
+        when(incidentService.getActiveIncidents()).thenReturn(incidents);
         GeographicResolution resolution = GeographicResolution.unresolved("No mapping");
         when(geographicResolutionService.resolve(BigDecimal.ONE, BigDecimal.ONE)).thenReturn(resolution);
         when(historicalRiskFeatureService.historicalIncidentRisk(resolution)).thenReturn(feature(RiskFactorType.HISTORICAL_INCIDENT));
-        when(incidentRiskFeatureService.userReportRisk(incidents)).thenReturn(feature(RiskFactorType.USER_REPORT));
+        when(incidentRiskFeatureService.userReportRisk(incidents, BigDecimal.ONE, BigDecimal.ONE))
+                .thenReturn(feature(RiskFactorType.USER_REPORT));
         when(timeOfDayRiskService.currentRisk()).thenReturn(feature(RiskFactorType.TIME_OF_DAY));
         when(weatherRiskService.currentRisk(BigDecimal.ONE, BigDecimal.ONE))
                 .thenReturn(feature(RiskFactorType.WEATHER));
@@ -53,7 +54,7 @@ class RiskContextAssemblerTest {
                 weatherRiskService).assembleForCurrentUser(userId);
 
         verify(locationService).getCurrentLocation(userId);
-        verify(incidentService).getIncidents(userId);
+        verify(incidentService).getActiveIncidents();
         verify(geographicResolutionService).resolve(BigDecimal.ONE, BigDecimal.ONE);
         // Weather is asked for the stored location through its own service boundary, not inline.
         verify(weatherRiskService).currentRisk(BigDecimal.ONE, BigDecimal.ONE);

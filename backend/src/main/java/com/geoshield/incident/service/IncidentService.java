@@ -17,4 +17,5 @@ public interface IncidentService extends ModuleService {
     ResponderIncidentResponse getIncidentForResponder(UUID incidentId);
     ResponderIncidentResponse updateIncidentStatus(UUID incidentId, String newStatus, UUID responderId);
     List<ResponderIncidentResponse> getAllIncidentsForAdmin();
+    List<IncidentResponse> getActiveIncidents();
 }
