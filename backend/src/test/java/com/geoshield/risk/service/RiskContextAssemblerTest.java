@@ -31,6 +31,7 @@ class RiskContextAssemblerTest {
     @Mock private IncidentRiskFeatureService incidentRiskFeatureService;
     @Mock private TimeOfDayRiskService timeOfDayRiskService;
     @Mock private WeatherRiskService weatherRiskService;
+    @Mock private EmergencyServiceProximityRiskService emergencyServiceProximityRiskService;
 
     @Test
     void usesModuleBoundariesAndPassesOnlyExplicitFeatureAvailabilityToBaseline() {
@@ -48,20 +49,24 @@ class RiskContextAssemblerTest {
         when(timeOfDayRiskService.currentRisk()).thenReturn(feature(RiskFactorType.TIME_OF_DAY));
         when(weatherRiskService.currentRisk(BigDecimal.ONE, BigDecimal.ONE))
                 .thenReturn(feature(RiskFactorType.WEATHER));
+        when(emergencyServiceProximityRiskService.proximityRisk(BigDecimal.ONE, BigDecimal.ONE))
+                .thenReturn(feature(RiskFactorType.SERVICE_PROXIMITY));
 
         var context = new RiskContextAssembler(locationService, incidentService, geographicResolutionService,
                 historicalRiskFeatureService, incidentRiskFeatureService, timeOfDayRiskService,
-                weatherRiskService).assembleForCurrentUser(userId);
+                weatherRiskService, emergencyServiceProximityRiskService).assembleForCurrentUser(userId);
 
         verify(locationService).getCurrentLocation(userId);
         verify(incidentService).getActiveIncidents();
         verify(geographicResolutionService).resolve(BigDecimal.ONE, BigDecimal.ONE);
         // Weather is asked for the stored location through its own service boundary, not inline.
         verify(weatherRiskService).currentRisk(BigDecimal.ONE, BigDecimal.ONE);
+        verify(emergencyServiceProximityRiskService).proximityRisk(BigDecimal.ONE, BigDecimal.ONE);
         assertFalse(context.historicalIncidentRisk().available());
         assertTrue(context.historicalIncidentRisk().unavailabilityReason().contains("No mapping"));
         assertFalse(context.userReportRisk().available());
         assertFalse(context.weatherRisk().available());
+        assertFalse(context.serviceProximityRisk().available());
     }
 
     private NormalizedRiskFeature feature(RiskFactorType type) {

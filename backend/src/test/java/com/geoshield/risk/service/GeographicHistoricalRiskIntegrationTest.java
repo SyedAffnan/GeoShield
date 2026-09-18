@@ -92,6 +92,7 @@ class GeographicHistoricalRiskIntegrationTest {
     @Mock private IdentityService identityService;
     @Mock private RiskScoreRepository riskScoreRepository;
     @Mock private User user;
+    @Mock private com.geoshield.emergencyservices.service.EmergencyServicesService emergencyServicesService;
 
     private UUID userId;
     private RiskContextAssembler assembler;
@@ -104,6 +105,8 @@ class GeographicHistoricalRiskIntegrationTest {
     @BeforeEach
     void setUp() {
         userId = UUID.randomUUID();
+        lenient().when(emergencyServicesService.findNearestFacility(org.mockito.ArgumentMatchers.anyDouble(),
+                org.mockito.ArgumentMatchers.anyDouble())).thenReturn(java.util.Optional.empty());
         assembler = assemblerObserving(WeatherObservationResult.observed(
                 new WeatherObservation(PROVIDER, OBSERVED_WMO_CODE, FIXED_INSTANT)));
         lenient().when(incidentService.getActiveIncidents()).thenReturn(List.of());
@@ -123,7 +126,8 @@ class GeographicHistoricalRiskIntegrationTest {
                 new TimeOfDayRiskService(Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
                         new MorthTimeOfDayDistribution()),
                 new WeatherRiskService(new FixedWeatherObservationProvider(weather),
-                        new MorthWeatherSeverityTable()));
+                        new MorthWeatherSeverityTable()),
+                new EmergencyServiceProximityRiskService(emergencyServicesService));
     }
 
     private void storedLocationIs(BigDecimal latitude, BigDecimal longitude) {
@@ -251,6 +255,38 @@ class GeographicHistoricalRiskIntegrationTest {
         assertEquals(0, userReport.weight().compareTo(new BigDecimal("0.10")));
         assertEquals(0, userReport.normalizedRisk().compareTo(new BigDecimal("25.00000000")));
         assertEquals(0, userReport.contribution().compareTo(new BigDecimal("2.50000000")));
+    }
+
+    @Test
+    void producesIncreasedRiskScoreWhenEmergencyServicesProximityIsEvaluated() {
+        storedLocationIs(LATITUDE, LONGITUDE);
+        morthPerLakhRecordsAreAvailable();
+
+        // Suppose nearest emergency facility is 5.0 km away:
+        // f_proximity = (5.0 / 10.0) * 100 = 50.0.
+        // Weight 0.15 -> contributes 50.0 * 0.15 = 7.5 risk points.
+        var centerResp = new com.geoshield.emergencyservices.dto.EmergencyServiceCenterResponse(
+                1L, "osm-node-1", "Bowring and Lady Curzon Hospital",
+                com.geoshield.emergencyservices.entity.CenterType.MEDICAL,
+                LATITUDE, LONGITUDE, "Bengaluru", "Karnataka", null);
+        when(emergencyServicesService.findNearestFacility(LATITUDE.doubleValue(), LONGITUDE.doubleValue()))
+                .thenReturn(java.util.Optional.of(new com.geoshield.emergencyservices.dto.NearestFacilityResult(centerResp, 5.0)));
+
+        var fusion = new BaselineRiskFusionService(approvedProperties(), identityService,
+                riskScoreRepository, new ObjectMapper());
+
+        BaselineRiskResult result = fusion.calculateBaselineRisk(assembler.assembleForCurrentUser(userId));
+
+        // Base 3 factors = 43.3828208150 + 7.50000000 = 50.8828208150
+        assertEquals(0, result.score().compareTo(new BigDecimal("50.8828208150")));
+        assertEquals(RiskLevel.MEDIUM, result.riskLevel());
+
+        var proximity = result.contributingFactors().stream()
+                .filter(factor -> factor.factor() == RiskFactorType.SERVICE_PROXIMITY).findFirst().orElseThrow();
+        assertTrue(proximity.available());
+        assertEquals(0, proximity.weight().compareTo(new BigDecimal("0.15")));
+        assertEquals(0, proximity.normalizedRisk().compareTo(new BigDecimal("50.00000000")));
+        assertEquals(0, proximity.contribution().compareTo(new BigDecimal("7.50000000")));
     }
 
     @Test

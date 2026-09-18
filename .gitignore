@@ -5,6 +5,7 @@ backend/.mvn/
 
 # Offline geodata preprocessing tools (dev-only; not a build or runtime dependency)
 tools/geodata/node_modules/
+tools/geodata/downloads/
 
 # Flutter / Dart
 mobile/.dart_tool/
