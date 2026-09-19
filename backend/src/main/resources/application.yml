@@ -2,9 +2,9 @@ spring:
   application:
     name: geoshield-backend
   datasource:
-    url: jdbc:mysql://localhost:3306/geoshield?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-    username: root
-    password: root
+    url: ${GEOSHIELD_DB_URL:jdbc:mysql://localhost:3306/geoshield?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    username: ${GEOSHIELD_DB_USERNAME:root}
+    password: ${GEOSHIELD_DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     open-in-view: false
@@ -30,7 +30,7 @@ geoshield:
   security:
     bcrypt-strength: ${GEOSHIELD_BCRYPT_STRENGTH:12}
   jwt:
-    secret: GeoShieldJwtSecretKey2026ForProjectReview123456789
+    secret: ${GEOSHIELD_JWT_SECRET}
     access-token-ttl: ${GEOSHIELD_JWT_ACCESS_TOKEN_TTL:PT15M}
     refresh-token-ttl: ${GEOSHIELD_JWT_REFRESH_TOKEN_TTL:P30D}
   risk:

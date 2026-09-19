@@ -5,6 +5,12 @@
          POST /api/v1/locations; no background or always-on location collection is performed. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Local notifications permission required for Android 13+ (API 33+) alert display. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Foreground service permissions prepared for future background geofencing / location tasks. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <application
         android:label="geoshield_mobile"
         android:name="${applicationName}"

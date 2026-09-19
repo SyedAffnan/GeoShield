@@ -20,7 +20,14 @@ public class RiskApiServiceImpl implements RiskApiService {
     @Transactional
     public RiskResponse getCurrentRisk(UUID userId) {
         BaselineRiskResult result = riskFusionService.calculateBaselineRisk(riskContextAssembler.assembleForCurrentUser(userId));
-        return new RiskResponse(result.score(), result.riskLevel(), result.recommendation(), result.contributingFactors(),
-                result.scoringMethod(), result.modelVersion());
+        return new RiskResponse(
+                result.score(),
+                result.riskLevel(),
+                result.recommendation(),
+                result.contributingFactors(),
+                result.dataCompleteness(),
+                result.factorDetails(),
+                result.scoringMethod(),
+                result.modelVersion());
     }
 }

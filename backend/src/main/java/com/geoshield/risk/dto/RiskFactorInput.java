@@ -3,7 +3,14 @@ package com.geoshield.risk.dto;
 import java.math.BigDecimal;
 
 /** A score is accepted only when its producing source is explicitly available. */
-public record RiskFactorInput(BigDecimal normalizedRisk, boolean available, String unavailabilityReason) {
+public record RiskFactorInput(
+        BigDecimal normalizedRisk,
+        boolean available,
+        String unavailabilityReason,
+        String reasonCode,
+        String rawValue,
+        String source) {
+
     public RiskFactorInput {
         if (available && normalizedRisk == null) {
             throw new IllegalArgumentException("An available risk factor requires a normalized score");
@@ -23,12 +30,20 @@ public record RiskFactorInput(BigDecimal normalizedRisk, boolean available, Stri
         }
     }
 
+    public RiskFactorInput(BigDecimal normalizedRisk, boolean available, String unavailabilityReason) {
+        this(normalizedRisk, available, unavailabilityReason, null, null, null);
+    }
+
     public RiskFactorInput(BigDecimal normalizedRisk, boolean available) {
-        this(normalizedRisk, available, available ? null : "No approved source data is currently available.");
+        this(normalizedRisk, available, available ? null : "No approved source data is currently available.", null, null, null);
     }
 
     public static RiskFactorInput available(BigDecimal normalizedRisk) {
-        return new RiskFactorInput(normalizedRisk, true, null);
+        return new RiskFactorInput(normalizedRisk, true, null, null, null, null);
+    }
+
+    public static RiskFactorInput available(BigDecimal normalizedRisk, String rawValue, String source) {
+        return new RiskFactorInput(normalizedRisk, true, null, null, rawValue, source);
     }
 
     public static RiskFactorInput unavailable() {
@@ -36,6 +51,10 @@ public record RiskFactorInput(BigDecimal normalizedRisk, boolean available, Stri
     }
 
     public static RiskFactorInput unavailable(String reason) {
-        return new RiskFactorInput(null, false, reason);
+        return unavailable(reason, null, null);
+    }
+
+    public static RiskFactorInput unavailable(String reason, String reasonCode, String source) {
+        return new RiskFactorInput(null, false, reason, reasonCode, null, source);
     }
 }

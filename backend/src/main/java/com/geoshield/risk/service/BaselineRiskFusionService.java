@@ -7,7 +7,9 @@ import com.geoshield.identity.entity.User;
 import com.geoshield.identity.service.IdentityService;
 import com.geoshield.risk.dto.BaselineRiskCalculationRequest;
 import com.geoshield.risk.dto.BaselineRiskResult;
+import com.geoshield.risk.dto.RiskDataCompleteness;
 import com.geoshield.risk.dto.RiskFactorContribution;
+import com.geoshield.risk.dto.RiskFactorDetail;
 import com.geoshield.risk.dto.RiskFactorInput;
 import com.geoshield.risk.dto.RiskFactorType;
 import com.geoshield.risk.dto.RiskLevel;
@@ -16,7 +18,9 @@ import com.geoshield.risk.entity.RiskScoringMethod;
 import com.geoshield.risk.repository.RiskScoreRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,27 +54,99 @@ public class BaselineRiskFusionService implements RiskFusionService {
                 contribution(RiskFactorType.USER_REPORT, request.userReportRisk(), properties.userReportWeight()),
                 contribution(RiskFactorType.CONNECTIVITY, request.connectivityRisk(), properties.connectivityWeight()),
                 contribution(RiskFactorType.OTHER_CONTEXT, request.otherContextRisk(), properties.otherContextWeight()));
+
+        List<RiskFactorDetail> factorDetails = List.of(
+                factorDetail(RiskFactorType.HISTORICAL_INCIDENT, request.historicalIncidentRisk(), properties.historicalIncidentWeight()),
+                factorDetail(RiskFactorType.WEATHER, request.weatherRisk(), properties.weatherWeight()),
+                factorDetail(RiskFactorType.TIME_OF_DAY, request.timeOfDayRisk(), properties.timeOfDayWeight()),
+                factorDetail(RiskFactorType.SERVICE_PROXIMITY, request.serviceProximityRisk(), properties.serviceProximityWeight()),
+                factorDetail(RiskFactorType.USER_REPORT, request.userReportRisk(), properties.userReportWeight()));
+
+        int availableLiveCount = (int) factorDetails.stream().filter(RiskFactorDetail::available).count();
+        List<RiskFactorType> missingFactors = factorDetails.stream()
+                .filter(detail -> !detail.available())
+                .map(RiskFactorDetail::factor)
+                .toList();
+        Map<RiskFactorType, String> missingReasons = new LinkedHashMap<>();
+        for (RiskFactorDetail detail : factorDetails) {
+            if (!detail.available()) {
+                missingReasons.put(detail.factor(), detail.reason());
+            }
+        }
+        RiskDataCompleteness completeness = RiskDataCompleteness.of(availableLiveCount, missingFactors, missingReasons);
+
         BigDecimal score = clamp(factors.stream().map(RiskFactorContribution::contribution)
                 .reduce(BigDecimal.ZERO, BigDecimal::add));
         RiskLevel riskLevel = classify(score);
-        BaselineRiskResult result = new BaselineRiskResult(score, riskLevel, factors, recommendation(riskLevel), BASELINE_METHOD, null);
+        BaselineRiskResult result = new BaselineRiskResult(
+                score,
+                riskLevel,
+                factors,
+                completeness,
+                factorDetails,
+                recommendation(riskLevel),
+                BASELINE_METHOD,
+                null);
         persist(request.userId(), result);
         return result;
     }
 
     private RiskFactorContribution contribution(RiskFactorType factor, RiskFactorInput input, BigDecimal weight) {
         if (!input.available()) {
-            return new RiskFactorContribution(factor, false, null, weight, BigDecimal.ZERO,
-                    factorLabel(factor) + " is unavailable: " + input.unavailabilityReason());
+            String reasonCode = input.reasonCode() != null ? input.reasonCode() : factor.name() + "_UNAVAILABLE";
+            return new RiskFactorContribution(
+                    factor,
+                    false,
+                    null,
+                    weight,
+                    BigDecimal.ZERO,
+                    factorLabel(factor) + " is unavailable: " + input.unavailabilityReason(),
+                    reasonCode,
+                    input.rawValue());
         }
         BigDecimal contribution = input.normalizedRisk().multiply(weight);
-        return new RiskFactorContribution(factor, true, input.normalizedRisk(), weight, contribution,
-                factorLabel(factor) + " contributed " + contribution.stripTrailingZeros().toPlainString() + " risk points.");
+        return new RiskFactorContribution(
+                factor,
+                true,
+                input.normalizedRisk(),
+                weight,
+                contribution,
+                factorLabel(factor) + " contributed " + contribution.stripTrailingZeros().toPlainString() + " risk points.",
+                null,
+                input.rawValue());
+    }
+
+    private RiskFactorDetail factorDetail(RiskFactorType factor, RiskFactorInput input, BigDecimal weight) {
+        if (!input.available()) {
+            String reasonCode = input.reasonCode() != null ? input.reasonCode() : factor.name() + "_UNAVAILABLE";
+            return new RiskFactorDetail(
+                    factor,
+                    weight,
+                    false,
+                    input.rawValue(),
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    reasonCode,
+                    factorLabel(factor) + " is unavailable: " + input.unavailabilityReason(),
+                    input.source());
+        }
+        BigDecimal contribution = input.normalizedRisk().multiply(weight);
+        return new RiskFactorDetail(
+                factor,
+                weight,
+                true,
+                input.rawValue(),
+                input.normalizedRisk(),
+                contribution,
+                null,
+                factorLabel(factor) + " contributed " + contribution.stripTrailingZeros().toPlainString() + " risk points.",
+                input.source());
     }
 
     private void persist(java.util.UUID userId, BaselineRiskResult result) {
         User user = identityService.getUserById(userId);
         try {
+            // Strictly preserves the JSON array root contract in risk_scores.contributing_factors.
             String factors = objectMapper.writeValueAsString(result.contributingFactors());
             int persistedScore = result.score().setScale(0, RoundingMode.HALF_UP).intValueExact();
             riskScoreRepository.save(new RiskScore(user, persistedScore, result.riskLevel(), factors,

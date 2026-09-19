@@ -10,8 +10,10 @@ import com.geoshield.location.entity.TouristLocation;
 import com.geoshield.location.mapper.LocationMapper;
 import com.geoshield.location.repository.RouteHistoryRepository;
 import com.geoshield.location.repository.TouristLocationRepository;
+import java.time.Clock;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,13 +23,32 @@ public class LocationServiceImpl implements LocationService {
     private final TouristLocationRepository touristLocationRepository;
     private final RouteHistoryRepository routeHistoryRepository;
     private final LocationMapper locationMapper;
+    private final LocationValidityPolicy validityPolicy;
+    private final Clock clock;
+
+    @Autowired
+    public LocationServiceImpl(IdentityService identityService, TouristLocationRepository touristLocationRepository,
+            RouteHistoryRepository routeHistoryRepository, LocationMapper locationMapper,
+            LocationValidityPolicy validityPolicy) {
+        this(identityService, touristLocationRepository, routeHistoryRepository, locationMapper,
+                validityPolicy, Clock.systemUTC());
+    }
 
     public LocationServiceImpl(IdentityService identityService, TouristLocationRepository touristLocationRepository,
-            RouteHistoryRepository routeHistoryRepository, LocationMapper locationMapper) {
+            RouteHistoryRepository routeHistoryRepository, LocationMapper locationMapper,
+            LocationValidityPolicy validityPolicy, Clock clock) {
         this.identityService = identityService;
         this.touristLocationRepository = touristLocationRepository;
         this.routeHistoryRepository = routeHistoryRepository;
         this.locationMapper = locationMapper;
+        this.validityPolicy = validityPolicy;
+        this.clock = clock;
+    }
+
+    public LocationServiceImpl(IdentityService identityService, TouristLocationRepository touristLocationRepository,
+            RouteHistoryRepository routeHistoryRepository, LocationMapper locationMapper) {
+        this(identityService, touristLocationRepository, routeHistoryRepository, locationMapper,
+                new LocationValidityPolicy(), Clock.systemUTC());
     }
 
     @Override
@@ -52,8 +73,15 @@ public class LocationServiceImpl implements LocationService {
     @Override
     @Transactional(readOnly = true)
     public LocationResponse getCurrentLocation(UUID userId) {
-        return locationMapper.toResponse(touristLocationRepository.findTopByUserIdOrderByRecordedAtDesc(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Current location not found")));
+        TouristLocation location = touristLocationRepository.findTopByUserIdOrderByRecordedAtDesc(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Current location not found"));
+
+        LocationValidityPolicy.LocationValidityResult validity = validityPolicy.validate(location, clock.instant());
+        if (!validity.isValid()) {
+            throw new ResourceNotFoundException("Current valid location not found: " + validity.reason());
+        }
+
+        return locationMapper.toResponse(location);
     }
 
     @Override
