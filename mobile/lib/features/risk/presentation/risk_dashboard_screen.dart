@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/di/providers.dart';
 import '../../../core/location/device_location_service.dart';
 import '../../../core/network/auth_exception.dart';
+import '../../../core/network/connectivity_state.dart';
 import '../../../core/network/network_exception.dart';
 import '../../sos/data/sos_repository.dart';
 import '../data/risk_repository.dart';
@@ -175,6 +176,7 @@ class _RiskDashboardScreenState extends ConsumerState<RiskDashboardScreen> {
             ),
       body: Column(
         children: [
+          const _ConnectivityStatusBanner(),
           if (_sosError != null)
             Material(
               color: colorScheme.errorContainer,
@@ -479,3 +481,77 @@ class _RiskFactorCard extends StatelessWidget {
         _ => factorName,
       };
 }
+
+class _ConnectivityStatusBanner extends ConsumerWidget {
+  const _ConnectivityStatusBanner();
+
+  String _formatDuration(Duration d) {
+    if (d.inHours > 0) {
+      return '${d.inHours}h ${d.inMinutes.remainder(60)}m';
+    } else if (d.inMinutes > 0) {
+      return '${d.inMinutes}m ${d.inSeconds.remainder(60)}s';
+    } else {
+      return '${d.inSeconds}s';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final connectivityAsync = ref.watch(connectivityStateProvider);
+    final state = connectivityAsync.asData?.value;
+    if (state == null) {
+      return const SizedBox.shrink();
+    }
+
+    final (IconData icon, Color bgColor, Color fgColor, String text) =
+        switch (state.status) {
+      OperationalConnectivityStatus.connectedReachable => (
+          Icons.cloud_done_outlined,
+          Colors.green.shade50,
+          Colors.green.shade800,
+          'Online • Backend reachable${state.backendRttMs != null ? ' (${state.backendRttMs} ms)' : ''}',
+        ),
+      OperationalConnectivityStatus.connectedBackendUnreachable => (
+          Icons.cloud_off_outlined,
+          Colors.amber.shade50,
+          Colors.amber.shade900,
+          'Connected • Backend unreachable${state.connectivityLossDuration.inSeconds > 0 ? ' (${_formatDuration(state.connectivityLossDuration)})' : ''}',
+        ),
+      OperationalConnectivityStatus.offline => (
+          Icons.wifi_off_outlined,
+          Colors.red.shade50,
+          Colors.red.shade900,
+          'Offline${state.connectivityLossDuration.inSeconds > 0 ? ' (${_formatDuration(state.connectivityLossDuration)})' : ''}',
+        ),
+      OperationalConnectivityStatus.unknown => (
+          Icons.sync,
+          Colors.grey.shade100,
+          Colors.grey.shade700,
+          'Checking connectivity…',
+        ),
+    };
+
+    return Container(
+      width: double.infinity,
+      color: bgColor,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: fgColor),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: fgColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

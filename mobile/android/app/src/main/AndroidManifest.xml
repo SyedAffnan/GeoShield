@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Required by all build variants because the mobile client calls the backend API. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Connectivity state monitoring for offline/unreachable operational telemetry. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Foreground-only location. The tourist's current GPS fix is read on demand to submit it to
          POST /api/v1/locations; no background or always-on location collection is performed. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />

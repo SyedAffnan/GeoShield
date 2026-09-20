@@ -13,6 +13,8 @@ import '../location/device_location_service.dart';
 import '../network/api_client.dart';
 import '../network/api_configuration.dart';
 import '../network/auth_exception.dart';
+import '../network/connectivity_service.dart';
+import '../network/connectivity_state.dart';
 import '../network/validation_exception.dart';
 import '../storage/secure_session_storage.dart';
 
@@ -22,6 +24,21 @@ final secureSessionStorageProvider = Provider<SecureSessionStorage>((ref) {
 
 final apiClientProvider = Provider<GeoShieldApiClient>((ref) {
   return GeoShieldApiClient(ref.watch(secureSessionStorageProvider));
+});
+
+final connectivityServiceProvider = Provider<ConnectivityService>((ref) {
+  final apiClient = ref.watch(apiClientProvider);
+  final service = ConnectivityService(
+    baseUrl: apiClient.baseUrl,
+  );
+  ref.onDispose(service.dispose);
+  return service;
+});
+
+final connectivityStateProvider = StreamProvider<ConnectivityState>((ref) async* {
+  final service = ref.watch(connectivityServiceProvider);
+  yield service.state;
+  yield* service.stateStream;
 });
 
 final apiConfigurationProvider =
@@ -126,6 +143,7 @@ class RiskDashboardController extends AutoDisposeNotifier<RiskDashboardState> {
   }
 
   Future<void> refresh() async {
+    unawaited(ref.read(connectivityServiceProvider).recheck());
     _emit(const RiskDashboardBusy(RiskDashboardStep.obtainingLocation));
     final result =
         await ref.read(deviceLocationServiceProvider).currentPosition();
