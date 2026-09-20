@@ -9,6 +9,10 @@ import '../../features/location/data/location_repository.dart';
 import '../../features/responder/data/responder_repository.dart';
 import '../../features/risk/data/risk_repository.dart';
 import '../../features/sos/data/sos_repository.dart';
+import '../geofencing/presentation/geofence_controller.dart';
+import '../geofencing/services/geofence_notification_service.dart';
+import '../geofencing/services/geofencing_engine.dart';
+import '../geofencing/services/hazard_geometry_provider.dart';
 import '../location/device_location_service.dart';
 import '../network/api_client.dart';
 import '../network/api_configuration.dart';
@@ -127,6 +131,26 @@ final riskRepositoryProvider = Provider<RiskRepository>((ref) {
   return RiskRepository(ref.watch(apiClientProvider));
 });
 
+final hazardGeometryProvider = Provider<HazardGeometryProvider>((ref) {
+  return const EmptyProductionHazardProvider();
+});
+
+final geofenceNotificationServiceProvider =
+    Provider<GeofenceNotificationService>((ref) {
+  return GeofenceNotificationService();
+});
+
+final geofencingEngineProvider = Provider<GeofencingEngine>((ref) {
+  return GeofencingEngine(
+    hazardProvider: ref.watch(hazardGeometryProvider),
+  );
+});
+
+final geofenceControllerProvider =
+    NotifierProvider<GeofenceController, GeofenceState>(
+  GeofenceController.new,
+);
+
 final riskDashboardProvider = NotifierProvider.autoDispose<
     RiskDashboardController, RiskDashboardState>(RiskDashboardController.new);
 
@@ -148,10 +172,15 @@ class RiskDashboardController extends AutoDisposeNotifier<RiskDashboardState> {
     final result =
         await ref.read(deviceLocationServiceProvider).currentPosition();
     if (result is DeviceLocationFailure) {
+      ref
+          .read(geofenceControllerProvider.notifier)
+          .setUnavailable('Location service unavailable');
       _emit(RiskDashboardLocationBlocked(result.reason));
       return;
     }
     final fix = result as DeviceLocationFix;
+    unawaited(
+        ref.read(geofenceControllerProvider.notifier).processLocationFix(fix));
     try {
       _emit(const RiskDashboardBusy(RiskDashboardStep.sendingLocation));
       final storedLocation =

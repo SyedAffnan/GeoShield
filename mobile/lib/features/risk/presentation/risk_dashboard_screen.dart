@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/di/providers.dart';
+import '../../../core/geofencing/presentation/geofence_status_card.dart';
 import '../../../core/location/device_location_service.dart';
 import '../../../core/network/auth_exception.dart';
 import '../../../core/network/connectivity_state.dart';
@@ -368,6 +369,8 @@ class _DashboardContent extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         children: [
           _LocationStatus(data: data),
+          const SizedBox(height: 16),
+          const GeofenceStatusCard(),
           const SizedBox(height: 16),
           Card(
             color: color.withValues(alpha: 0.10),
