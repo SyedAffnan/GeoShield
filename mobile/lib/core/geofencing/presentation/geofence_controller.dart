@@ -57,7 +57,10 @@ class GeofenceController extends Notifier<GeofenceState> {
       ref.read(geofenceNotificationServiceProvider);
 
   @override
-  GeofenceState build() => const GeofenceInitial();
+  GeofenceState build() {
+    Future.microtask(() => _notificationService.initialize());
+    return const GeofenceInitial();
+  }
 
   /// Processes a new location fix from device location service.
   Future<void> processLocationFix(DeviceLocationFix fix) async {
@@ -89,22 +92,33 @@ class GeofenceController extends Notifier<GeofenceState> {
     double? minDistance;
     bool anySynthetic = false;
 
+    // First determine the highest active zone across all hazards
     for (final hazard in hazards) {
       final tracking = _engine.trackingStates[hazard.id];
       if (tracking == null) continue;
-
-      if (minDistance == null || tracking.lastDistanceMeters < minDistance) {
-        minDistance = tracking.lastDistanceMeters;
-        nearestId = hazard.id;
-        nearestName = hazard.name;
-        anySynthetic = hazard.isSynthetic;
-      }
 
       if (tracking.currentZone == GeofenceZone.core) {
         highestZone = GeofenceZone.core;
       } else if (tracking.currentZone == GeofenceZone.preWarning &&
           highestZone != GeofenceZone.core) {
         highestZone = GeofenceZone.preWarning;
+      }
+    }
+
+    // Select the nearest hazard within the highest zone (or nearest overall if outside)
+    for (final hazard in hazards) {
+      final tracking = _engine.trackingStates[hazard.id];
+      if (tracking == null) continue;
+
+      final matchesZone = highestZone == GeofenceZone.outside ||
+          tracking.currentZone == highestZone;
+
+      if (matchesZone &&
+          (minDistance == null || tracking.lastDistanceMeters < minDistance)) {
+        minDistance = tracking.lastDistanceMeters;
+        nearestId = hazard.id;
+        nearestName = hazard.name;
+        anySynthetic = hazard.isSynthetic;
       }
     }
 

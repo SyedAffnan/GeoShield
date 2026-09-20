@@ -132,7 +132,7 @@ final riskRepositoryProvider = Provider<RiskRepository>((ref) {
 });
 
 final hazardGeometryProvider = Provider<HazardGeometryProvider>((ref) {
-  return const EmptyProductionHazardProvider();
+  return SyntheticTestHazardProvider();
 });
 
 final geofenceNotificationServiceProvider =
