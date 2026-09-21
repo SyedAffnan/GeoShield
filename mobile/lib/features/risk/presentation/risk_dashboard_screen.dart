@@ -11,6 +11,7 @@ import '../../../core/network/network_exception.dart';
 import '../../sos/data/sos_repository.dart';
 import '../data/risk_repository.dart';
 import 'sachet_disaster_alert_card.dart';
+import '../../news/presentation/recent_safety_events_card.dart';
 
 class RiskDashboardScreen extends ConsumerStatefulWidget {
   const RiskDashboardScreen({super.key});
@@ -378,6 +379,8 @@ class _DashboardContent extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
           ],
+          const RecentSafetyEventsCard(),
+          const SizedBox(height: 16),
           const GeofenceStatusCard(),
           const SizedBox(height: 16),
           Card(

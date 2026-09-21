@@ -58,6 +58,19 @@ geoshield:
       enabled: ${GEOSHIELD_HISTORICAL_INGESTION_ENABLED:false}
       morth-source: ${GEOSHIELD_HISTORICAL_MORTH_SOURCE:}
       ncrb-source: ${GEOSHIELD_HISTORICAL_NCRB_SOURCE:}
+  news:
+    enabled: ${GEOSHIELD_NEWS_ENABLED:false}
+    provider: ${GEOSHIELD_NEWS_PROVIDER:gnews}
+    api-key: ${GEOSHIELD_NEWS_API_KEY:}
+    base-url: ${GEOSHIELD_NEWS_BASE_URL:https://gnews.io/api/v4}
+    connect-timeout: ${GEOSHIELD_NEWS_CONNECT_TIMEOUT:PT3S}
+    read-timeout: ${GEOSHIELD_NEWS_READ_TIMEOUT:PT5S}
+    cache-ttl-minutes: ${GEOSHIELD_NEWS_CACHE_TTL_MINUTES:45}
+    cache-max-size: ${GEOSHIELD_NEWS_CACHE_MAX_SIZE:200}
+    lookback-hours: ${GEOSHIELD_NEWS_LOOKBACK_HOURS:72}
+    max-results: ${GEOSHIELD_NEWS_MAX_RESULTS:10}
+    language: ${GEOSHIELD_NEWS_LANGUAGE:en}
+    country: ${GEOSHIELD_NEWS_COUNTRY:in}
 
 logging:
   structured:
