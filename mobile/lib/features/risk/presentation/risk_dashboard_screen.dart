@@ -10,6 +10,7 @@ import '../../../core/network/connectivity_state.dart';
 import '../../../core/network/network_exception.dart';
 import '../../sos/data/sos_repository.dart';
 import '../data/risk_repository.dart';
+import 'sachet_disaster_alert_card.dart';
 
 class RiskDashboardScreen extends ConsumerStatefulWidget {
   const RiskDashboardScreen({super.key});
@@ -370,25 +371,65 @@ class _DashboardContent extends ConsumerWidget {
         children: [
           _LocationStatus(data: data),
           const SizedBox(height: 16),
+          if (risk.activeDisasterAlert != null) ...[
+            SachetDisasterAlertCard(
+              alert: risk.activeDisasterAlert!,
+              overrideActive: risk.overrideActive,
+            ),
+            const SizedBox(height: 16),
+          ],
           const GeofenceStatusCard(),
           const SizedBox(height: 16),
           Card(
-            color: color.withValues(alpha: 0.10),
+            color: (risk.overrideActive
+                    ? Theme.of(context).colorScheme.error
+                    : color)
+                .withValues(alpha: 0.10),
             child: Padding(
               padding: const EdgeInsets.all(24),
               child: Column(children: [
-                const Text('CURRENT GEOSHIELD SAFETY SCORE'),
+                Text(risk.overrideActive
+                    ? 'CURRENT SAFETY SCORE (BASELINE PRESERVED)'
+                    : 'CURRENT GEOSHIELD SAFETY SCORE'),
                 const SizedBox(height: 12),
                 Text(risk.safetyScore.toStringAsFixed(0),
                     style: Theme.of(context)
                         .textTheme
                         .displayLarge
                         ?.copyWith(color: color)),
-                Text(risk.riskLevel,
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleLarge
-                        ?.copyWith(color: color, fontWeight: FontWeight.bold)),
+                if (risk.overrideActive) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Baseline: ${risk.riskLevel}',
+                        style: TextStyle(
+                          color: Colors.grey.shade700,
+                          decoration: TextDecoration.lineThrough,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(Icons.arrow_forward,
+                          size: 16, color: Theme.of(context).colorScheme.error),
+                      const SizedBox(width: 8),
+                      Text(
+                        'OVERRIDE: ${risk.effectiveRiskLevel ?? 'CRITICAL'}',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                ] else ...[
+                  Text(risk.riskLevel,
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(color: color, fontWeight: FontWeight.bold)),
+                ],
                 const SizedBox(height: 16),
                 Text(risk.recommendation, textAlign: TextAlign.center),
               ]),

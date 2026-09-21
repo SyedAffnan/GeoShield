@@ -1,5 +1,6 @@
 package com.geoshield.risk.dto;
 
+import com.geoshield.notification.dto.SachetAlertSummary;
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -12,7 +13,22 @@ public record RiskResponse(
         RiskDataCompleteness dataCompleteness,
         List<RiskFactorDetail> factorDetails,
         String modelType,
-        String modelVersion) {
+        String modelVersion,
+        boolean overrideActive,
+        RiskLevel effectiveRiskLevel,
+        SachetAlertSummary activeDisasterAlert) {
+
+    public RiskResponse(
+            BigDecimal safetyScore,
+            RiskLevel riskLevel,
+            String recommendation,
+            List<RiskFactorContribution> contributingFactors,
+            RiskDataCompleteness dataCompleteness,
+            List<RiskFactorDetail> factorDetails,
+            String modelType,
+            String modelVersion) {
+        this(safetyScore, riskLevel, recommendation, contributingFactors, dataCompleteness, factorDetails, modelType, modelVersion, false, riskLevel, null);
+    }
 
     public RiskResponse(
             BigDecimal safetyScore,
@@ -21,6 +37,6 @@ public record RiskResponse(
             List<RiskFactorContribution> contributingFactors,
             String modelType,
             String modelVersion) {
-        this(safetyScore, riskLevel, recommendation, contributingFactors, null, null, modelType, modelVersion);
+        this(safetyScore, riskLevel, recommendation, contributingFactors, null, null, modelType, modelVersion, false, riskLevel, null);
     }
 }

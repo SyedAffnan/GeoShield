@@ -1,6 +1,7 @@
 import '../../../core/location/device_location_service.dart';
 import '../../../core/network/api_client.dart';
 import '../../location/data/location_repository.dart';
+import 'sachet_alert_model.dart';
 
 class RiskFactor {
   const RiskFactor({
@@ -31,11 +32,17 @@ class RiskResult {
     required this.riskLevel,
     required this.recommendation,
     required this.factors,
+    this.overrideActive = false,
+    this.effectiveRiskLevel,
+    this.activeDisasterAlert,
   });
   final double safetyScore;
   final String riskLevel;
   final String recommendation;
   final List<RiskFactor> factors;
+  final bool overrideActive;
+  final String? effectiveRiskLevel;
+  final SachetAlertModel? activeDisasterAlert;
 
   factory RiskResult.fromJson(Map<String, dynamic> json) => RiskResult(
         safetyScore: (json['safetyScore'] as num).toDouble(),
@@ -45,6 +52,12 @@ class RiskResult {
             .map((item) =>
                 RiskFactor.fromJson(Map<String, dynamic>.from(item as Map)))
             .toList(growable: false),
+        overrideActive: json['overrideActive'] as bool? ?? false,
+        effectiveRiskLevel: json['effectiveRiskLevel'] as String?,
+        activeDisasterAlert: json['activeDisasterAlert'] != null
+            ? SachetAlertModel.fromJson(
+                Map<String, dynamic>.from(json['activeDisasterAlert'] as Map))
+            : null,
       );
 }
 

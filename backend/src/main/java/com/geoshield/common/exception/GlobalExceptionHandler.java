@@ -28,6 +28,8 @@ public class GlobalExceptionHandler {
     ResponseEntity<ApiError> handleForbidden(ForbiddenException exception) { return error(HttpStatus.FORBIDDEN, exception.getMessage(), "FORBIDDEN"); }
     @ExceptionHandler(ValidationException.class)
     ResponseEntity<ApiError> handleValidation(ValidationException exception) { return error(HttpStatus.BAD_REQUEST, exception.getMessage(), "VALIDATION_ERROR"); }
+    @ExceptionHandler(IllegalArgumentException.class)
+    ResponseEntity<ApiError> handleIllegalArgument(IllegalArgumentException exception) { return error(HttpStatus.BAD_REQUEST, exception.getMessage(), "VALIDATION_ERROR"); }
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ApiError> handleMethodArgumentNotValid(MethodArgumentNotValidException exception) {
         String message = exception.getBindingResult().getFieldErrors().stream().findFirst()

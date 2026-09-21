@@ -7,6 +7,7 @@ import com.geoshield.location.service.LocationService;
 import com.geoshield.risk.dto.BaselineRiskCalculationRequest;
 import com.geoshield.risk.dto.GeographicResolution;
 import com.geoshield.risk.dto.NormalizedRiskFeature;
+import com.geoshield.risk.dto.RiskAssemblyContext;
 import com.geoshield.risk.dto.RiskFactorInput;
 import com.geoshield.risk.dto.RiskFactorType;
 import com.geoshield.risk.dto.RiskFeatureVector;
@@ -42,7 +43,7 @@ public class RiskContextAssembler {
     }
 
     @Transactional(readOnly = true)
-    public BaselineRiskCalculationRequest assembleForCurrentUser(UUID userId) {
+    public RiskAssemblyContext assembleContextForCurrentUser(UUID userId) {
         // Enforces the approved precondition and avoids direct Location repository access.
         LocationResponse location = locationService.getCurrentLocation(userId);
         List<IncidentResponse> userReports = incidentService.getActiveIncidents();
@@ -61,10 +62,17 @@ public class RiskContextAssembler {
                 incidents, unavailable(RiskFactorType.CONNECTIVITY, "Client connectivity", "No client connectivity input contract is configured."),
                 unavailable(RiskFactorType.OTHER_CONTEXT, "Other context", "No other approved contextual signal is available.")));
 
-        return new BaselineRiskCalculationRequest(userId, vector.feature(RiskFactorType.HISTORICAL_INCIDENT).toRiskFactorInput(),
+        BaselineRiskCalculationRequest request = new BaselineRiskCalculationRequest(userId, vector.feature(RiskFactorType.HISTORICAL_INCIDENT).toRiskFactorInput(),
                 vector.feature(RiskFactorType.WEATHER).toRiskFactorInput(), vector.feature(RiskFactorType.TIME_OF_DAY).toRiskFactorInput(),
                 vector.feature(RiskFactorType.SERVICE_PROXIMITY).toRiskFactorInput(), vector.feature(RiskFactorType.USER_REPORT).toRiskFactorInput(),
                 vector.feature(RiskFactorType.CONNECTIVITY).toRiskFactorInput(), vector.feature(RiskFactorType.OTHER_CONTEXT).toRiskFactorInput());
+
+        return new RiskAssemblyContext(request, location);
+    }
+
+    @Transactional(readOnly = true)
+    public BaselineRiskCalculationRequest assembleForCurrentUser(UUID userId) {
+        return assembleContextForCurrentUser(userId).request();
     }
 
     private NormalizedRiskFeature unavailable(RiskFactorType type, String source, String reason) {
