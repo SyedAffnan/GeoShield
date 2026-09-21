@@ -372,6 +372,10 @@ class _DashboardContent extends ConsumerWidget {
         children: [
           _LocationStatus(data: data),
           const SizedBox(height: 16),
+          if (risk.dataCompleteness != null && risk.dataCompleteness!.degraded) ...[
+            _DataCompletenessNoticeCard(completeness: risk.dataCompleteness!),
+            const SizedBox(height: 16),
+          ],
           if (risk.activeDisasterAlert != null) ...[
             SachetDisasterAlertCard(
               alert: risk.activeDisasterAlert!,
@@ -597,6 +601,67 @@ class _ConnectivityStatusBanner extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _DataCompletenessNoticeCard extends StatelessWidget {
+  const _DataCompletenessNoticeCard({required this.completeness});
+  final RiskDataCompletenessModel completeness;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.amber.shade700.withValues(alpha: 0.4)),
+      ),
+      color: Colors.amber.shade50.withValues(alpha: 0.5),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.info_outline, size: 20, color: Colors.amber.shade800),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Informational: Partial Data Availability (${completeness.availableFactorCount}/${completeness.expectedLiveFactorCount} factors)',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: Colors.amber.shade900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Baseline score reflects only verified live data signals. No artificial penalties are applied for unavailable factors.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade800,
+                    ),
+                  ),
+                  if (completeness.missingFactors.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Unavailable: ${completeness.missingFactors.join(", ")}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey.shade700,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

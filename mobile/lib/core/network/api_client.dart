@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../storage/secure_session_storage.dart';
 import 'auth_exception.dart';
@@ -12,8 +13,21 @@ abstract class ApiClient {
 
 /// HTTP client for the Spring Boot API. It never logs credentials or tokens.
 class GeoShieldApiClient implements ApiClient {
+  /// Bounded timeouts to ensure mobile requests fail safely and reliably.
+  static const Duration defaultConnectTimeout = Duration(seconds: 10);
+  static const Duration defaultReceiveTimeout = Duration(seconds: 15);
+  static const Duration defaultSendTimeout = Duration(seconds: 10);
+
   GeoShieldApiClient(this._sessionStorage, {Dio? dio})
-      : _dio = dio ?? Dio(BaseOptions(baseUrl: defaultBaseUrl));
+      : _dio = dio ??
+            Dio(
+              BaseOptions(
+                baseUrl: defaultBaseUrl,
+                connectTimeout: defaultConnectTimeout,
+                receiveTimeout: defaultReceiveTimeout,
+                sendTimeout: defaultSendTimeout,
+              ),
+            );
 
   /// Compile-time override retained for emulator, CI, and developer workflows.
   static const defaultBaseUrl = String.fromEnvironment(
@@ -31,7 +45,9 @@ class GeoShieldApiClient implements ApiClient {
     _dio.options.baseUrl = normalizeBaseUrl(baseUrl);
   }
 
-  static String normalizeBaseUrl(String value) {
+  /// Normalizes and validates the server base URL.
+  /// When [requireHttps] is true (enforced in release mode), non-local HTTP origins are rejected.
+  static String normalizeBaseUrl(String value, {bool requireHttps = kReleaseMode}) {
     final uri = Uri.tryParse(value.trim());
     if (uri == null ||
         (uri.scheme != 'http' && uri.scheme != 'https') ||
@@ -41,10 +57,23 @@ class GeoShieldApiClient implements ApiClient {
         uri.hasQuery ||
         uri.hasFragment) {
       throw const FormatException(
-        'Enter a server URL such as http://192.168.0.13:8080 without an API path.',
+        'Enter a valid server URL such as https://api.geoshield.com or http://10.0.2.2:8080 without an API path.',
+      );
+    }
+    if (requireHttps && uri.scheme == 'http' && !_isLocalDevelopmentHost(uri.host)) {
+      throw const FormatException(
+        'Production API endpoint must use HTTPS. Insecure HTTP is restricted to local development.',
       );
     }
     return uri.replace(path: '', query: null, fragment: null).toString();
+  }
+
+  static bool _isLocalDevelopmentHost(String host) {
+    return host == 'localhost' ||
+        host == '127.0.0.1' ||
+        host == '10.0.2.2' ||
+        host == '10.0.3.2' ||
+        host.endsWith('.local');
   }
 
   @override

@@ -51,13 +51,32 @@ public class StateBoundaryIndex {
      * @param longitude WGS84 longitude in degrees (GeoJSON x axis)
      * @param latitude  WGS84 latitude in degrees (GeoJSON y axis)
      */
+    public record ResolvedBoundary(String stateName, String stateCode) { }
+
     public Optional<String> resolveStateName(double longitude, double latitude) {
+        return resolveState(longitude, latitude).map(ResolvedBoundary::stateName);
+    }
+
+    /**
+     * Resolves a WGS84 coordinate to its State/UT boundary match including state name and stcode.
+     *
+     * @param longitude WGS84 longitude in degrees (GeoJSON x axis)
+     * @param latitude  WGS84 latitude in degrees (GeoJSON y axis)
+     */
+    public Optional<ResolvedBoundary> resolveState(double longitude, double latitude) {
         for (StateBoundary boundary : boundaries) {
             if (boundary.contains(longitude, latitude)) {
-                return Optional.of(boundary.stateName());
+                return Optional.of(new ResolvedBoundary(boundary.stateName(), boundary.stateCode()));
             }
         }
         return Optional.empty();
+    }
+
+    /**
+     * Resolves a WGS84 coordinate to its state code (stcode).
+     */
+    public Optional<String> resolveStateCode(double longitude, double latitude) {
+        return resolveState(longitude, latitude).map(ResolvedBoundary::stateCode);
     }
 
     /** Number of State/UT boundaries loaded. */

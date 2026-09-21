@@ -61,4 +61,13 @@ class DataInitializerTest {
 
         verify(userRepository, never()).save(any(User.class));
     }
+
+    @Test
+    void skipsSeedingWhenDevSeedDisabled() {
+        DataInitializer disabledInitializer = new DataInitializer(userRepository, roleRepository, passwordEncoder, false);
+
+        disabledInitializer.run(null);
+
+        verify(userRepository, never()).save(any(User.class));
+    }
 }

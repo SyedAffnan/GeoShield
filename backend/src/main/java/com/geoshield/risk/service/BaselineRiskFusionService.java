@@ -21,6 +21,7 @@ import java.math.RoundingMode;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -78,7 +79,9 @@ public class BaselineRiskFusionService implements RiskFusionService {
         BigDecimal score = clamp(factors.stream().map(RiskFactorContribution::contribution)
                 .reduce(BigDecimal.ZERO, BigDecimal::add));
         RiskLevel riskLevel = classify(score);
+        UUID decisionId = UUID.randomUUID();
         BaselineRiskResult result = new BaselineRiskResult(
+                decisionId,
                 score,
                 riskLevel,
                 factors,
@@ -148,9 +151,27 @@ public class BaselineRiskFusionService implements RiskFusionService {
         try {
             // Strictly preserves the JSON array root contract in risk_scores.contributing_factors.
             String factors = objectMapper.writeValueAsString(result.contributingFactors());
+            String completenessJson = result.dataCompleteness() != null ? objectMapper.writeValueAsString(result.dataCompleteness()) : null;
+            String factorDetailsJson = result.factorDetails() != null ? objectMapper.writeValueAsString(result.factorDetails()) : null;
             int persistedScore = result.score().setScale(0, RoundingMode.HALF_UP).intValueExact();
-            riskScoreRepository.save(new RiskScore(user, persistedScore, result.riskLevel(), factors,
-                    RiskScoringMethod.BASELINE_WEIGHTED, null));
+            riskScoreRepository.save(new RiskScore(
+                    result.decisionId(),
+                    user,
+                    persistedScore,
+                    result.score(),
+                    result.riskLevel(),
+                    result.riskLevel(),
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    completenessJson,
+                    factorDetailsJson,
+                    factors,
+                    RiskScoringMethod.BASELINE_WEIGHTED,
+                    null
+            ));
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("Unable to serialize baseline risk explanations", exception);
         }

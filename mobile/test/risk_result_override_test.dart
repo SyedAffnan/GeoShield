@@ -136,5 +136,38 @@ void main() {
       expect(result.activeDisasterAlert!.severity, 'Extreme');
       expect(result.activeDisasterAlert!.isSynthetic, true);
     });
+
+    test('fromJson parses decisionId and dataCompleteness when present', () {
+      final json = {
+        'decisionId': 'd3b07384-d113-46cf-824b-97e37e96e001',
+        'safetyScore': 65.0,
+        'riskLevel': 'MEDIUM',
+        'recommendation': 'Exercise increased caution.',
+        'contributingFactors': [],
+        'overrideActive': false,
+        'dataCompleteness': {
+          'availableFactorCount': 3,
+          'expectedLiveFactorCount': 5,
+          'availabilityRatio': 0.6,
+          'degraded': true,
+          'missingFactors': ['SERVICE_PROXIMITY', 'USER_REPORT'],
+          'missingReasons': {
+            'SERVICE_PROXIMITY': 'Service directory offline',
+            'USER_REPORT': 'No recent incidents'
+          }
+        }
+      };
+
+      final result = RiskResult.fromJson(json);
+
+      expect(result.decisionId, 'd3b07384-d113-46cf-824b-97e37e96e001');
+      expect(result.dataCompleteness, isNotNull);
+      expect(result.dataCompleteness!.availableFactorCount, 3);
+      expect(result.dataCompleteness!.expectedLiveFactorCount, 5);
+      expect(result.dataCompleteness!.availabilityRatio, 0.6);
+      expect(result.dataCompleteness!.degraded, true);
+      expect(result.dataCompleteness!.missingFactors, ['SERVICE_PROXIMITY', 'USER_REPORT']);
+      expect(result.dataCompleteness!.missingReasons['SERVICE_PROXIMITY'], 'Service directory offline');
+    });
   });
 }

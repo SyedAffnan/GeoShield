@@ -10,10 +10,10 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: ${GEOSHIELD_JPA_SHOW_SQL:false}
     properties:
       hibernate:
-        format_sql: true
+        format_sql: ${GEOSHIELD_JPA_FORMAT_SQL:false}
         dialect: org.hibernate.dialect.MySQLDialect
         jdbc:
           time_zone: UTC
@@ -27,6 +27,8 @@ server:
     include-message: never
 
 geoshield:
+  dev-seed:
+    enabled: ${GEOSHIELD_DEV_SEED_ENABLED:true}
   security:
     bcrypt-strength: ${GEOSHIELD_BCRYPT_STRENGTH:12}
   jwt:

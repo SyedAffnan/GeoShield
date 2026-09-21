@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/admin/data/admin_repository.dart';
@@ -132,6 +133,9 @@ final riskRepositoryProvider = Provider<RiskRepository>((ref) {
 });
 
 final hazardGeometryProvider = Provider<HazardGeometryProvider>((ref) {
+  if (kReleaseMode) {
+    return const EmptyProductionHazardProvider();
+  }
   return SyntheticTestHazardProvider();
 });
 

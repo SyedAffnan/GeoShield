@@ -67,7 +67,7 @@ public class RiskContextAssembler {
                 vector.feature(RiskFactorType.SERVICE_PROXIMITY).toRiskFactorInput(), vector.feature(RiskFactorType.USER_REPORT).toRiskFactorInput(),
                 vector.feature(RiskFactorType.CONNECTIVITY).toRiskFactorInput(), vector.feature(RiskFactorType.OTHER_CONTEXT).toRiskFactorInput());
 
-        return new RiskAssemblyContext(request, location);
+        return new RiskAssemblyContext(request, location, resolution);
     }
 
     @Transactional(readOnly = true)

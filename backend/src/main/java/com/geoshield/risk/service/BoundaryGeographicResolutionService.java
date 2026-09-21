@@ -52,8 +52,8 @@ public class BoundaryGeographicResolutionService implements GeographicResolution
 
         // GeoJSON positions are [longitude, latitude]; the Location module supplies
         // latitude and longitude separately, so the axis order is set explicitly here.
-        return stateBoundaryIndex.resolveStateName(longitude.doubleValue(), latitude.doubleValue())
-                .map(stateName -> GeographicResolution.resolved(GeographicLevel.STATE_UT, stateName))
+        return stateBoundaryIndex.resolveState(longitude.doubleValue(), latitude.doubleValue())
+                .map(state -> GeographicResolution.resolved(GeographicLevel.STATE_UT, state.stateName(), state.stateCode()))
                 .orElseGet(() -> GeographicResolution.unresolved(
                         "No India State/UT boundary contains the coordinate " + latitude.toPlainString()
                                 + ", " + longitude.toPlainString() + "."));

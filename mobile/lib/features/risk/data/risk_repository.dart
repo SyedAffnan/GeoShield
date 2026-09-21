@@ -26,6 +26,39 @@ class RiskFactor {
       );
 }
 
+class RiskDataCompletenessModel {
+  const RiskDataCompletenessModel({
+    required this.availableFactorCount,
+    required this.expectedLiveFactorCount,
+    required this.availabilityRatio,
+    required this.degraded,
+    required this.missingFactors,
+    required this.missingReasons,
+  });
+  final int availableFactorCount;
+  final int expectedLiveFactorCount;
+  final double availabilityRatio;
+  final bool degraded;
+  final List<String> missingFactors;
+  final Map<String, String> missingReasons;
+
+  factory RiskDataCompletenessModel.fromJson(Map<String, dynamic> json) =>
+      RiskDataCompletenessModel(
+        availableFactorCount: json['availableFactorCount'] as int? ?? 0,
+        expectedLiveFactorCount: json['expectedLiveFactorCount'] as int? ?? 5,
+        availabilityRatio:
+            (json['availabilityRatio'] as num?)?.toDouble() ?? 0.0,
+        degraded: json['degraded'] as bool? ?? false,
+        missingFactors: (json['missingFactors'] as List<dynamic>?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            const [],
+        missingReasons: (json['missingReasons'] as Map<String, dynamic>?)
+                ?.map((k, v) => MapEntry(k, v.toString())) ??
+            const {},
+      );
+}
+
 class RiskResult {
   const RiskResult({
     required this.safetyScore,
@@ -35,6 +68,8 @@ class RiskResult {
     this.overrideActive = false,
     this.effectiveRiskLevel,
     this.activeDisasterAlert,
+    this.decisionId,
+    this.dataCompleteness,
   });
   final double safetyScore;
   final String riskLevel;
@@ -43,6 +78,8 @@ class RiskResult {
   final bool overrideActive;
   final String? effectiveRiskLevel;
   final SachetAlertModel? activeDisasterAlert;
+  final String? decisionId;
+  final RiskDataCompletenessModel? dataCompleteness;
 
   factory RiskResult.fromJson(Map<String, dynamic> json) => RiskResult(
         safetyScore: (json['safetyScore'] as num).toDouble(),
@@ -57,6 +94,11 @@ class RiskResult {
         activeDisasterAlert: json['activeDisasterAlert'] != null
             ? SachetAlertModel.fromJson(
                 Map<String, dynamic>.from(json['activeDisasterAlert'] as Map))
+            : null,
+        decisionId: json['decisionId'] as String?,
+        dataCompleteness: json['dataCompleteness'] != null
+            ? RiskDataCompletenessModel.fromJson(
+                Map<String, dynamic>.from(json['dataCompleteness'] as Map))
             : null,
       );
 }

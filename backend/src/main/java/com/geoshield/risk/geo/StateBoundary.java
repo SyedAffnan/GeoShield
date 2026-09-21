@@ -31,11 +31,11 @@ final class StateBoundary {
         return false;
     }
 
-    String stateName() {
+    public String stateName() {
         return stateName;
     }
 
-    String stateCode() {
+    public String stateCode() {
         return stateCode;
     }
 

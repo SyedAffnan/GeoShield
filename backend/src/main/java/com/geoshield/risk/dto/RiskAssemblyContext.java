@@ -8,5 +8,10 @@ import com.geoshield.location.dto.LocationResponse;
  */
 public record RiskAssemblyContext(
         BaselineRiskCalculationRequest request,
-        LocationResponse location
-) {}
+        LocationResponse location,
+        GeographicResolution resolution
+) {
+    public RiskAssemblyContext(BaselineRiskCalculationRequest request, LocationResponse location) {
+        this(request, location, null);
+    }
+}

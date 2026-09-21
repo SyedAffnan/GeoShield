@@ -12,14 +12,17 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Bootstrap data initializer for development and testing environments.
  * Seeds default administrator and emergency responder accounts if none exist in the database.
- * NOTE: These are DEVELOPMENT / DEMO credentials for academic review and demonstration.
+ * Gated to non-production environments and disabled when geoshield.dev-seed.enabled is false.
  */
 @Service
+@Profile("!prod")
 @Order(10)
 public class DataInitializer implements ApplicationRunner {
     private static final Logger log = LoggerFactory.getLogger(DataInitializer.class);
@@ -27,16 +30,31 @@ public class DataInitializer implements ApplicationRunner {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final boolean devSeedEnabled;
 
-    public DataInitializer(UserRepository userRepository, RoleRepository roleRepository, PasswordEncoder passwordEncoder) {
+    public DataInitializer(UserRepository userRepository,
+                           RoleRepository roleRepository,
+                           PasswordEncoder passwordEncoder,
+                           @Value("${geoshield.dev-seed.enabled:true}") boolean devSeedEnabled) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
+        this.devSeedEnabled = devSeedEnabled;
+    }
+
+    public DataInitializer(UserRepository userRepository,
+                           RoleRepository roleRepository,
+                           PasswordEncoder passwordEncoder) {
+        this(userRepository, roleRepository, passwordEncoder, true);
     }
 
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
+        if (!devSeedEnabled) {
+            log.info("[DEVELOPMENT/DEMO] Development account seeding is explicitly disabled by configuration.");
+            return;
+        }
         seedDefaultAdmin();
         seedDefaultResponder();
     }
@@ -54,7 +72,7 @@ public class DataInitializer implements ApplicationRunner {
                         adminRole
                 );
                 userRepository.save(admin);
-                log.info("[DEVELOPMENT/DEMO] Seeded default Administrator: admin@geoshield.com / Admin@123456");
+                log.info("[DEVELOPMENT/DEMO] Seeded default development Administrator account (admin@geoshield.com)");
             }
         }
     }
@@ -72,7 +90,7 @@ public class DataInitializer implements ApplicationRunner {
                         responderRole
                 );
                 userRepository.save(responder);
-                log.info("[DEVELOPMENT/DEMO] Seeded default Emergency Responder: responder@geoshield.com / Responder@123456");
+                log.info("[DEVELOPMENT/DEMO] Seeded default development Emergency Responder account (responder@geoshield.com)");
             }
         }
     }
