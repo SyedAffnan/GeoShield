@@ -23,7 +23,7 @@ void main() {
   group('GeoShieldApiClient.normalizeBaseUrl', () {
     test('retains a valid origin and removes a trailing slash', () {
       expect(
-        GeoShieldApiClient.normalizeBaseUrl('http://192.168.0.13:8080/', requireHttps: false),
+        GeoShieldApiClient.normalizeBaseUrl('http://192.168.0.13:8080/'),
         'http://192.168.0.13:8080',
       );
     });
@@ -35,28 +35,28 @@ void main() {
       );
     });
 
-    test('enforces HTTPS for remote production hosts when requireHttps is true', () {
+    test('enforces HTTPS for remote production hosts', () {
       expect(
-        () => GeoShieldApiClient.normalizeBaseUrl('http://api.geoshield.com', requireHttps: true),
+        () => GeoShieldApiClient.normalizeBaseUrl('http://api.geoshield.com'),
         throwsFormatException,
       );
       expect(
-        GeoShieldApiClient.normalizeBaseUrl('https://api.geoshield.com', requireHttps: true),
+        GeoShieldApiClient.normalizeBaseUrl('https://api.geoshield.com'),
         'https://api.geoshield.com',
       );
     });
 
-    test('permits local development loopback origins over cleartext HTTP even when requireHttps is true', () {
+    test('permits local development loopback origins over cleartext HTTP', () {
       expect(
-        GeoShieldApiClient.normalizeBaseUrl('http://10.0.2.2:8080', requireHttps: true),
+        GeoShieldApiClient.normalizeBaseUrl('http://10.0.2.2:8080'),
         'http://10.0.2.2:8080',
       );
       expect(
-        GeoShieldApiClient.normalizeBaseUrl('http://localhost:8080', requireHttps: true),
+        GeoShieldApiClient.normalizeBaseUrl('http://localhost:8080'),
         'http://localhost:8080',
       );
       expect(
-        GeoShieldApiClient.normalizeBaseUrl('http://127.0.0.1:8080', requireHttps: true),
+        GeoShieldApiClient.normalizeBaseUrl('http://127.0.0.1:8080'),
         'http://127.0.0.1:8080',
       );
     });
@@ -65,7 +65,6 @@ void main() {
       expect(
         () => GeoShieldApiClient.normalizeBaseUrl(
           'http://192.168.0.13:8080/api/v1',
-          requireHttps: false,
         ),
         throwsFormatException,
       );
@@ -78,6 +77,36 @@ void main() {
       );
       expect(
         () => GeoShieldApiClient.normalizeBaseUrl('http://example.org?x=1'),
+        throwsFormatException,
+      );
+    });
+
+    test('strictly rejects .local, spoofed loopback subdomains, and userinfo hosts', () {
+      expect(
+        () => GeoShieldApiClient.normalizeBaseUrl('http://evil.local:8080'),
+        throwsFormatException,
+      );
+      expect(
+        () => GeoShieldApiClient.normalizeBaseUrl('http://localhost.evil.com:8080'),
+        throwsFormatException,
+      );
+      expect(
+        () => GeoShieldApiClient.normalizeBaseUrl('http://127.0.0.1.evil.com:8080'),
+        throwsFormatException,
+      );
+      expect(
+        () => GeoShieldApiClient.normalizeBaseUrl('http://10.0.2.2.evil.com:8080'),
+        throwsFormatException,
+      );
+      expect(
+        () => GeoShieldApiClient.normalizeBaseUrl('http://localhost@evil.com:8080'),
+        throwsFormatException,
+      );
+    });
+
+    test('rejects arbitrary remote cleartext HTTP hosts', () {
+      expect(
+        () => GeoShieldApiClient.normalizeBaseUrl('http://external.service.org'),
         throwsFormatException,
       );
     });

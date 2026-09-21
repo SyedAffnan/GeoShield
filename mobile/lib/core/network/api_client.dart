@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 
 import '../storage/secure_session_storage.dart';
 import 'auth_exception.dart';
@@ -22,7 +21,7 @@ class GeoShieldApiClient implements ApiClient {
       : _dio = dio ??
             Dio(
               BaseOptions(
-                baseUrl: defaultBaseUrl,
+                baseUrl: normalizeBaseUrl(defaultBaseUrl),
                 connectTimeout: defaultConnectTimeout,
                 receiveTimeout: defaultReceiveTimeout,
                 sendTimeout: defaultSendTimeout,
@@ -46,8 +45,8 @@ class GeoShieldApiClient implements ApiClient {
   }
 
   /// Normalizes and validates the server base URL.
-  /// When [requireHttps] is true (enforced in release mode), non-local HTTP origins are rejected.
-  static String normalizeBaseUrl(String value, {bool requireHttps = kReleaseMode}) {
+  /// Enforces HTTP/HTTPS scheme and valid host syntax. Non-local cleartext HTTP origins are rejected.
+  static String normalizeBaseUrl(String value) {
     final uri = Uri.tryParse(value.trim());
     if (uri == null ||
         (uri.scheme != 'http' && uri.scheme != 'https') ||
@@ -60,7 +59,7 @@ class GeoShieldApiClient implements ApiClient {
         'Enter a valid server URL such as https://api.geoshield.com or http://10.0.2.2:8080 without an API path.',
       );
     }
-    if (requireHttps && uri.scheme == 'http' && !_isLocalDevelopmentHost(uri.host)) {
+    if (uri.scheme == 'http' && !_isLocalDevelopmentHost(uri.host)) {
       throw const FormatException(
         'Production API endpoint must use HTTPS. Insecure HTTP is restricted to local development.',
       );
@@ -68,12 +67,15 @@ class GeoShieldApiClient implements ApiClient {
     return uri.replace(path: '', query: null, fragment: null).toString();
   }
 
+  static final RegExp _privateSubnet192 =
+      RegExp(r'^192\.168\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$');
+
   static bool _isLocalDevelopmentHost(String host) {
     return host == 'localhost' ||
         host == '127.0.0.1' ||
         host == '10.0.2.2' ||
         host == '10.0.3.2' ||
-        host.endsWith('.local');
+        _privateSubnet192.hasMatch(host);
   }
 
   @override

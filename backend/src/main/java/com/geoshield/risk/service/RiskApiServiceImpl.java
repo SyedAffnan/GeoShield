@@ -45,9 +45,9 @@ public class RiskApiServiceImpl implements RiskApiService {
             RiskFusionService riskFusionService,
             LocationService locationService,
             SachetAlertService sachetAlertService,
-            @Autowired(required = false) RiskScoreRepository riskScoreRepository,
-            @Autowired(required = false) IdentityService identityService,
-            @Autowired(required = false) ObjectMapper objectMapper) {
+            RiskScoreRepository riskScoreRepository,
+            IdentityService identityService,
+            ObjectMapper objectMapper) {
         this.riskContextAssembler = riskContextAssembler;
         this.riskFusionService = riskFusionService;
         this.locationService = locationService;
@@ -57,6 +57,7 @@ public class RiskApiServiceImpl implements RiskApiService {
         this.objectMapper = objectMapper;
     }
 
+    /** Test-only convenience constructor without audit persistence dependencies. */
     public RiskApiServiceImpl(
             RiskContextAssembler riskContextAssembler,
             RiskFusionService riskFusionService,
@@ -65,6 +66,7 @@ public class RiskApiServiceImpl implements RiskApiService {
         this(riskContextAssembler, riskFusionService, locationService, sachetAlertService, null, null, null);
     }
 
+    /** Test-only convenience constructor for lightweight unit tests. */
     public RiskApiServiceImpl(
             RiskContextAssembler riskContextAssembler,
             RiskFusionService riskFusionService) {
@@ -196,7 +198,7 @@ public class RiskApiServiceImpl implements RiskApiService {
             );
             riskScoreRepository.save(score);
         } catch (JsonProcessingException ex) {
-            log.error("Unable to serialize risk audit details for user {}", userId, ex);
+            throw new IllegalStateException("Unable to serialize risk audit details for user " + userId, ex);
         }
     }
 }

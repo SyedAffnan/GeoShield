@@ -258,8 +258,8 @@ class RiskDecisionAuditInstrumentationTest {
     }
 
     @Test
-    @DisplayName("Strict tourist isolation: queries to RiskScoreRepository enforce userId scoping")
-    void strictTouristIsolationEnforced() {
+    @DisplayName("Repository query contract: documents userId scoping contract for historical risk retrieval")
+    void repositoryContract_findAllByUserId_documentsUserScopingContract() {
         UUID touristA = UUID.randomUUID();
         UUID touristB = UUID.randomUUID();
 
@@ -277,7 +277,7 @@ class RiskDecisionAuditInstrumentationTest {
 
         assertEquals(1, historyA.size());
         assertEquals("Goa", historyA.get(0).getGeographicUnit());
-        assertTrue(historyB.isEmpty(), "Tourist B must never receive Tourist A's historical risk decisions");
+        assertTrue(historyB.isEmpty(), "Specification: repository consumer expects tourist isolation based on query parameter");
     }
 
     @Test
@@ -324,5 +324,50 @@ class RiskDecisionAuditInstrumentationTest {
         assertEquals(decimalScore, saved.getDecimalScore());
         assertEquals("Delhi", saved.getGeographicUnit());
         assertEquals("07", saved.getStateCode());
+    }
+
+    @Test
+    @DisplayName("H2: Serialization failure in fallback audit persistence throws IllegalStateException (fail-fast)")
+    void fallbackPersistenceThrowsIllegalStateExceptionOnSerializationFailure() throws Exception {
+        UUID decisionId = UUID.randomUUID();
+        BaselineRiskResult baselineResult = new BaselineRiskResult(
+                decisionId, new BigDecimal("45.00"), RiskLevel.MEDIUM, List.of(),
+                null, null, "Exercise caution", "BASELINE_WEIGHTED", null
+        );
+
+        BaselineRiskCalculationRequest request = new BaselineRiskCalculationRequest(
+                userId, RiskFactorInput.unavailable(), RiskFactorInput.unavailable(),
+                RiskFactorInput.unavailable(), RiskFactorInput.unavailable(),
+                RiskFactorInput.unavailable(), RiskFactorInput.unavailable(),
+                RiskFactorInput.unavailable()
+        );
+
+        LocationResponse location = new LocationResponse(
+                1L, BigDecimal.valueOf(28.6139), BigDecimal.valueOf(77.2090),
+                BigDecimal.valueOf(10.0), BigDecimal.ZERO, Instant.now()
+        );
+        GeographicResolution resolution = GeographicResolution.resolved(GeographicLevel.STATE_UT, "Delhi", "07");
+
+        when(riskContextAssembler.assembleContextForCurrentUser(userId))
+                .thenReturn(new RiskAssemblyContext(request, location, resolution));
+        when(riskFusionService.calculateBaselineRisk(request)).thenReturn(baselineResult);
+        when(riskScoreRepository.findByDecisionId(decisionId)).thenReturn(Optional.empty());
+        when(identityService.getUserById(userId)).thenReturn(user);
+
+        ObjectMapper failingMapper = org.mockito.Mockito.mock(ObjectMapper.class);
+        when(failingMapper.writeValueAsString(any())).thenThrow(new com.fasterxml.jackson.core.JsonParseException(null, "simulated error"));
+
+        RiskApiServiceImpl serviceWithFailingMapper = new RiskApiServiceImpl(
+                riskContextAssembler,
+                riskFusionService,
+                locationService,
+                sachetAlertService,
+                riskScoreRepository,
+                identityService,
+                failingMapper
+        );
+
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () ->
+                serviceWithFailingMapper.getCurrentRisk(userId));
     }
 }

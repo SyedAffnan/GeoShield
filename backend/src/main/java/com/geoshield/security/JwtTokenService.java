@@ -68,6 +68,9 @@ public class JwtTokenService {
         if (jwtProperties.secret() == null || jwtProperties.secret().getBytes(StandardCharsets.UTF_8).length < MINIMUM_HMAC_SECRET_BYTES) {
             throw new JwtAuthenticationException("JWT secret must contain at least 32 bytes");
         }
+        if (jwtProperties.secret().toUpperCase().contains("CHANGE_ME")) {
+            throw new JwtAuthenticationException("JWT secret contains placeholder value and must be configured with a secure key");
+        }
         return jwtProperties.secret().getBytes(StandardCharsets.UTF_8);
     }
 

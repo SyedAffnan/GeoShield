@@ -16,21 +16,26 @@ import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.math.BigDecimal;
 import java.util.UUID;
 
 @Entity
-@Table(name = "risk_scores", indexes = {
-        @Index(name = "idx_risk_scores_user_created", columnList = "user_id,created_at"),
-        @Index(name = "idx_risk_scores_decision_id", columnList = "decision_id")
-})
+@Table(name = "risk_scores",
+        indexes = {
+                @Index(name = "idx_risk_scores_user_created", columnList = "user_id,created_at"),
+                @Index(name = "idx_risk_scores_decision_id", columnList = "decision_id")
+        },
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_risk_scores_decision_id", columnNames = "decision_id")
+        })
 public class RiskScore extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "risk_score_id", nullable = false, updatable = false)
     private Long id;
 
-    @Column(name = "decision_id")
+    @Column(name = "decision_id", unique = true)
     private UUID decisionId;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

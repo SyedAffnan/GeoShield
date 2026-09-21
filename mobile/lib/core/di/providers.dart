@@ -133,7 +133,7 @@ final riskRepositoryProvider = Provider<RiskRepository>((ref) {
 });
 
 final hazardGeometryProvider = Provider<HazardGeometryProvider>((ref) {
-  if (kReleaseMode) {
+  if (!kDebugMode) {
     return const EmptyProductionHazardProvider();
   }
   return SyntheticTestHazardProvider();

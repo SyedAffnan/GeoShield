@@ -28,7 +28,7 @@ class DataInitializerTest {
 
     @BeforeEach
     void setUp() {
-        dataInitializer = new DataInitializer(userRepository, roleRepository, passwordEncoder);
+        dataInitializer = new DataInitializer(userRepository, roleRepository, passwordEncoder, true);
     }
 
     @Test
@@ -67,6 +67,15 @@ class DataInitializerTest {
         DataInitializer disabledInitializer = new DataInitializer(userRepository, roleRepository, passwordEncoder, false);
 
         disabledInitializer.run(null);
+
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    void skipsSeedingByDefaultWhenNoExplicitOptIn() {
+        DataInitializer defaultInitializer = new DataInitializer(userRepository, roleRepository, passwordEncoder);
+
+        defaultInitializer.run(null);
 
         verify(userRepository, never()).save(any(User.class));
     }

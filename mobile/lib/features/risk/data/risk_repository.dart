@@ -59,6 +59,43 @@ class RiskDataCompletenessModel {
       );
 }
 
+class RiskFactorDetailModel {
+  const RiskFactorDetailModel({
+    required this.factor,
+    required this.weight,
+    required this.available,
+    this.rawValue,
+    this.normalizedValue,
+    this.weightedContribution,
+    this.reason,
+    this.explanation,
+    this.source,
+  });
+  final String factor;
+  final double weight;
+  final bool available;
+  final String? rawValue;
+  final double? normalizedValue;
+  final double? weightedContribution;
+  final String? reason;
+  final String? explanation;
+  final String? source;
+
+  factory RiskFactorDetailModel.fromJson(Map<String, dynamic> json) =>
+      RiskFactorDetailModel(
+        factor: (json['factor'] ?? json['factorName'] ?? '') as String,
+        weight: (json['weight'] as num).toDouble(),
+        available: json['available'] as bool,
+        rawValue: json['rawValue'] as String?,
+        normalizedValue: (json['normalizedValue'] as num?)?.toDouble(),
+        weightedContribution:
+            (json['weightedContribution'] as num?)?.toDouble(),
+        reason: json['reason'] as String?,
+        explanation: json['explanation'] as String?,
+        source: json['source'] as String?,
+      );
+}
+
 class RiskResult {
   const RiskResult({
     required this.safetyScore,
@@ -70,6 +107,7 @@ class RiskResult {
     this.activeDisasterAlert,
     this.decisionId,
     this.dataCompleteness,
+    this.factorDetails = const [],
   });
   final double safetyScore;
   final String riskLevel;
@@ -80,6 +118,7 @@ class RiskResult {
   final SachetAlertModel? activeDisasterAlert;
   final String? decisionId;
   final RiskDataCompletenessModel? dataCompleteness;
+  final List<RiskFactorDetailModel> factorDetails;
 
   factory RiskResult.fromJson(Map<String, dynamic> json) => RiskResult(
         safetyScore: (json['safetyScore'] as num).toDouble(),
@@ -100,6 +139,11 @@ class RiskResult {
             ? RiskDataCompletenessModel.fromJson(
                 Map<String, dynamic>.from(json['dataCompleteness'] as Map))
             : null,
+        factorDetails: (json['factorDetails'] as List<dynamic>?)
+                ?.map((item) => RiskFactorDetailModel.fromJson(
+                    Map<String, dynamic>.from(item as Map)))
+                .toList(growable: false) ??
+            const [],
       );
 }
 

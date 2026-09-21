@@ -35,7 +35,7 @@ public class DataInitializer implements ApplicationRunner {
     public DataInitializer(UserRepository userRepository,
                            RoleRepository roleRepository,
                            PasswordEncoder passwordEncoder,
-                           @Value("${geoshield.dev-seed.enabled:true}") boolean devSeedEnabled) {
+                           @Value("${geoshield.dev-seed.enabled:false}") boolean devSeedEnabled) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
@@ -45,7 +45,7 @@ public class DataInitializer implements ApplicationRunner {
     public DataInitializer(UserRepository userRepository,
                            RoleRepository roleRepository,
                            PasswordEncoder passwordEncoder) {
-        this(userRepository, roleRepository, passwordEncoder, true);
+        this(userRepository, roleRepository, passwordEncoder, false);
     }
 
     @Override

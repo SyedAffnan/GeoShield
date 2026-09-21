@@ -23,4 +23,22 @@ class JwtTokenServiceTest {
         assertThat(principal.role()).isEqualTo(Role.TOURIST);
         assertThat(tokenService.accessTokenExpiresInSeconds()).isEqualTo(900);
     }
+
+    @Test
+    void rejectsPlaceholderSecretContainingChangeMe() {
+        String placeholderSecret = "CHANGE_ME_IN_PRODUCTION_MIN_32_BYTES_SECRET_KEY!";
+        org.junit.jupiter.api.Assertions.assertThrows(
+                JwtAuthenticationException.class,
+                () -> new JwtTokenService(new JwtProperties(placeholderSecret, Duration.ofMinutes(15), Duration.ofDays(30)))
+        );
+    }
+
+    @Test
+    void rejectsSecretShorterThan32Bytes() {
+        String shortSecret = "too-short-secret";
+        org.junit.jupiter.api.Assertions.assertThrows(
+                JwtAuthenticationException.class,
+                () -> new JwtTokenService(new JwtProperties(shortSecret, Duration.ofMinutes(15), Duration.ofDays(30)))
+        );
+    }
 }

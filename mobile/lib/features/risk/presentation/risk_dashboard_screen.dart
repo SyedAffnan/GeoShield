@@ -439,13 +439,28 @@ class _DashboardContent extends ConsumerWidget {
                 ],
                 const SizedBox(height: 16),
                 Text(risk.recommendation, textAlign: TextAlign.center),
+                if (risk.decisionId != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    'Audit Decision ID: ${risk.decisionId}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontFamily: 'monospace',
+                      color: Colors.grey.shade600,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ]),
             ),
           ),
           const SizedBox(height: 24),
           Text('Risk factors', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
-          ...risk.factors.map((factor) => _RiskFactorCard(factor: factor)),
+          ...risk.factors.map((factor) {
+            final detail = risk.factorDetails.where((d) => d.factor == factor.factor).firstOrNull;
+            return RiskFactorCard(factor: factor, detail: detail);
+          }),
           const SizedBox(height: 8),
           OutlinedButton.icon(
             onPressed: () => context.push('/incidents'),
@@ -494,9 +509,10 @@ class _LocationStatus extends StatelessWidget {
   }
 }
 
-class _RiskFactorCard extends StatelessWidget {
-  const _RiskFactorCard({required this.factor});
+class RiskFactorCard extends StatelessWidget {
+  const RiskFactorCard({super.key, required this.factor, this.detail});
   final RiskFactor factor;
+  final RiskFactorDetailModel? detail;
 
   @override
   Widget build(BuildContext context) => Card(
@@ -504,16 +520,55 @@ class _RiskFactorCard extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(_labelFor(factor.factor),
-                style: Theme.of(context).textTheme.titleMedium),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(_labelFor(factor.factor),
+                    style: Theme.of(context).textTheme.titleMedium),
+                if (detail != null)
+                  Text(
+                    'Weight ${(detail!.weight * 100).toStringAsFixed(0)}%',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+              ],
+            ),
             const SizedBox(height: 4),
             Text(factor.available ? 'AVAILABLE' : 'UNAVAILABLE',
                 style: TextStyle(
-                    color: factor.available ? Colors.green : Colors.grey)),
+                    color: factor.available ? Colors.green : Colors.grey,
+                    fontWeight: FontWeight.w600)),
             if (factor.available) ...[
               const SizedBox(height: 8),
-              Text('Risk: ${factor.normalizedRisk!.toStringAsFixed(2)}'),
-              Text('Contribution: ${factor.contribution.toStringAsFixed(2)}'),
+              if (detail?.rawValue != null && detail!.rawValue!.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    'Observed: ${detail!.rawValue}',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+                  ),
+                ),
+              Text('Risk: ${(factor.normalizedRisk ?? 0).toStringAsFixed(2)}'),
+              Text('Contribution: ${factor.contribution.toStringAsFixed(2)} pts'),
+            ] else if (detail?.reason != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Reason: ${detail!.reason}',
+                style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade700,
+                    fontStyle: FontStyle.italic),
+              ),
+            ],
+            if (detail?.source != null && detail!.source!.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Source: ${detail!.source}',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              ),
             ],
             const SizedBox(height: 8),
             Text(factor.explanation),
@@ -646,10 +701,22 @@ class _DataCompletenessNoticeCard extends StatelessWidget {
                       color: Colors.grey.shade800,
                     ),
                   ),
-                  if (completeness.missingFactors.isNotEmpty) ...[
+                  if (completeness.missingReasons.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    ...completeness.missingReasons.entries.map((entry) => Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            '• ${_humanizeFactorName(entry.key)}: ${_humanizeReasonCode(entry.value)}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade800,
+                            ),
+                          ),
+                        )),
+                  ] else if (completeness.missingFactors.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text(
-                      'Unavailable: ${completeness.missingFactors.join(", ")}',
+                      'Unavailable: ${completeness.missingFactors.map(_humanizeFactorName).join(", ")}',
                       style: TextStyle(
                         fontSize: 11,
                         color: Colors.grey.shade700,
@@ -665,5 +732,29 @@ class _DataCompletenessNoticeCard extends StatelessWidget {
       ),
     );
   }
+
+  static String _humanizeFactorName(String factorName) => switch (factorName) {
+        'HISTORICAL_INCIDENT' => 'Historical Risk',
+        'TIME_OF_DAY' => 'Time of Day',
+        'SERVICE_PROXIMITY' => 'Service Proximity',
+        'USER_REPORT' => 'User Report',
+        'OTHER_CONTEXT' => 'Other Context',
+        'CONNECTIVITY' => 'Connectivity',
+        'WEATHER' => 'Weather',
+        _ => factorName,
+      };
+
+  static String _humanizeReasonCode(String code) => switch (code) {
+        'NO_COORDINATES' => 'Location coordinates not provided',
+        'STATE_RESOLUTION_FAILED' => 'State/UT boundary lookup unavailable',
+        'MORTH_DATA_UNAVAILABLE' => 'Historical road safety baseline unavailable',
+        'NCRB_DATA_UNAVAILABLE' => 'Historical crime statistics unavailable',
+        'OPEN_METEO_DISABLED' => 'Weather provider disabled by configuration',
+        'OPEN_METEO_UNREACHABLE' => 'Weather provider temporarily unreachable',
+        'OPEN_METEO_ERROR' => 'Weather provider returned an error',
+        'INCIDENT_MODULE_UNAVAILABLE' => 'Incident feed unavailable for current location',
+        'EMERGENCY_SERVICES_UNAVAILABLE' => 'Emergency service proximity lookup not configured',
+        _ => code.replaceAll('_', ' ').toLowerCase(),
+      };
 }
 
