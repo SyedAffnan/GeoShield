@@ -23,7 +23,7 @@ public record NewsProperties(
 ) {
     public NewsProperties {
         if (provider == null || provider.isBlank()) {
-            provider = "gnews";
+            provider = (apiKey != null && !apiKey.isBlank()) ? "gnews" : "mock";
         }
         if (baseUrl == null || baseUrl.isBlank()) {
             baseUrl = "https://gnews.io/api/v4";

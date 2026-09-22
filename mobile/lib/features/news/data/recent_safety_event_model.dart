@@ -44,10 +44,10 @@ class RecentSafetyEventModel {
       sourceUrl: json['sourceUrl'] as String? ?? '',
       imageUrl: json['imageUrl'] as String?,
       publishedAt: json['publishedAt'] != null
-          ? DateTime.parse(json['publishedAt'] as String)
+          ? (DateTime.tryParse(json['publishedAt'].toString()) ?? DateTime.now())
           : DateTime.now(),
       retrievedAt: json['retrievedAt'] != null
-          ? DateTime.parse(json['retrievedAt'] as String)
+          ? (DateTime.tryParse(json['retrievedAt'].toString()) ?? DateTime.now())
           : DateTime.now(),
       category: json['category'] as String? ?? 'GENERAL_SAFETY',
       severity: json['severity'] as String? ?? 'UNKNOWN',

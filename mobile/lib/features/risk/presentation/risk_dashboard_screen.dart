@@ -12,6 +12,7 @@ import '../../../core/network/network_exception.dart';
 import '../../sos/data/sos_outbox_item.dart';
 import '../../sos/data/sos_repository.dart';
 import '../data/risk_repository.dart';
+import 'historical_trend_advisory_card.dart';
 import 'sachet_disaster_alert_card.dart';
 import '../../news/presentation/recent_safety_events_card.dart';
 
@@ -464,6 +465,7 @@ class _DashboardContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final risk = data.risk;
     final color = _riskColor(context, risk.riskLevel);
+    final advisoryAsync = ref.watch(historicalTrendAdvisoryProvider);
     return RefreshIndicator(
       onRefresh: () => ref.read(riskDashboardProvider.notifier).refresh(),
       child: ListView(
@@ -552,6 +554,12 @@ class _DashboardContent extends ConsumerWidget {
                 ],
               ]),
             ),
+          ),
+          const SizedBox(height: 16),
+          advisoryAsync.when(
+            data: (advisory) => HistoricalTrendAdvisoryCard(advisory: advisory),
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
           ),
           const SizedBox(height: 24),
           Text('Risk factors', style: Theme.of(context).textTheme.titleLarge),

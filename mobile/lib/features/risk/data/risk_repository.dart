@@ -1,6 +1,7 @@
 import '../../../core/location/device_location_service.dart';
 import '../../../core/network/api_client.dart';
 import '../../location/data/location_repository.dart';
+import 'historical_advisory_model.dart';
 import 'sachet_alert_model.dart';
 
 class RiskFactor {
@@ -218,4 +219,12 @@ class RiskRepository {
   /// risk level, recommendation, and factor explanations are entirely server-computed.
   Future<RiskResult> getCurrentRisk() async =>
       RiskResult.fromJson(await _client.getData('/api/v1/risk') as Map<String, dynamic>);
+
+  /// Reads the retrospective 2024 transport accident severity advisory for the
+  /// authenticated tourist. Informational only and decoupled from risk calculation.
+  Future<HistoricalTrendAdvisoryModel> getHistoricalTrendAdvisory() async {
+    final response = await _client.getData('/api/v1/risk/historical-advisory')
+        as Map<String, dynamic>;
+    return HistoricalTrendAdvisoryModel.fromJson(response);
+  }
 }

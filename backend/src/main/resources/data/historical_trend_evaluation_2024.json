@@ -1,0 +1,353 @@
+{
+  "targetYear": 2024,
+  "advisoryReleaseVersion": "1.0.0-p0",
+  "predictionSource": "2024_TEMPORAL_HOLDOUT",
+  "trainingPeriod": "2021-2023",
+  "trainingRows": 107,
+  "evaluationRows": 35,
+  "evaluationMetrics": {
+    "r2": 0.9122,
+    "mae": 3.879,
+    "rmse": 6.1331,
+    "baseline_mae": 16.4128,
+    "temporalHoldout2024R2": 0.912,
+    "temporalHoldout2024Mae": 3.88,
+    "temporalHoldout2024Rmse": 6.13,
+    "temporalHoldout2024BaselineMae": 16.41,
+    "spatialGroupKFoldR2": 0.778,
+    "spatialGroupKFoldMae": 5.28
+  },
+  "datasetIdentifier": "geosheild_ml_lagged_features.csv",
+  "datasetHashSha256": "e2eba6a1f3276d9b345827d22ac3dfd1a524107d6539eb23a96aac211aff5167",
+  "artifactGeneratedAt": "2026-09-22T17:55:50Z",
+  "trainingTimestamp": null,
+  "trainingTimestampStatus": "UNAVAILABLE_NOT_RECORDED_IN_ORIGINAL_EXPERIMENT",
+  "modelArtifact": null,
+  "modelArtifactStatus": "UNAVAILABLE_FOR_THIS_TEMPORAL_HOLDOUT",
+  "modelConfiguration": {
+    "n_estimators": 300,
+    "max_depth": 5,
+    "min_samples_split": 5,
+    "min_samples_leaf": 2,
+    "random_state": 42,
+    "n_jobs": 1
+  },
+  "limitations": "Retrospective 2024 model evaluation on state-level aggregate transport accident statistics. Does not capture real-time road conditions, crime, personal victimization, or tourist-specific incidents.",
+  "records": [
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Andaman and Nicobar Islands",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 21.48148148,
+      "predictedValue": 19.26009352,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Andhra Pradesh",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 42.67525694,
+      "predictedValue": 41.48430362,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Arunachal Pradesh",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 60.64981949,
+      "predictedValue": 46.0278161,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Assam",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 42.69877676,
+      "predictedValue": 42.98452088,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Bihar",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 80.5081826,
+      "predictedValue": 82.50911255,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Chandigarh",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 44.37869822,
+      "predictedValue": 41.33183588,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Chhattisgarh",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 46.74564179,
+      "predictedValue": 43.52363495,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Dadra and Nagar Haveli and Daman and Diu",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 62.5,
+      "predictedValue": 40.80524689,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Delhi",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 27.41735902,
+      "predictedValue": 25.46415465,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Goa",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 10.66368382,
+      "predictedValue": 9.66178131,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Gujarat",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 49.50603028,
+      "predictedValue": 47.09268539,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Haryana",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 47.81766266,
+      "predictedValue": 46.91338858,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Himachal Pradesh",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 40.30612245,
+      "predictedValue": 41.45340608,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Jammu and Kashmir",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 14.30785124,
+      "predictedValue": 13.73119678,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Jharkhand",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 79.17628945,
+      "predictedValue": 79.21648059,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Karnataka",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 28.7724676,
+      "predictedValue": 27.89125815,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Kerala",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 7.94528402,
+      "predictedValue": 10.44609099,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Ladakh",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 23.10606061,
+      "predictedValue": 18.95573789,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Madhya Pradesh",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 26.10068997,
+      "predictedValue": 25.23280076,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Maharashtra",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 43.51016114,
+      "predictedValue": 41.04640648,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Manipur",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 24.08026756,
+      "predictedValue": 19.45945508,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Meghalaya",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 73.23420074,
+      "predictedValue": 74.05920225,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Mizoram",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 93.22033898,
+      "predictedValue": 84.08958221,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Nagaland",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 48.0620155,
+      "predictedValue": 32.6159073,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Odisha",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 49.63232323,
+      "predictedValue": 46.93920664,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Puducherry",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 15.23410203,
+      "predictedValue": 10.28896163,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Punjab",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 78.49249546,
+      "predictedValue": 77.49973068,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Rajasthan",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 47.46758998,
+      "predictedValue": 47.16610847,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Sikkim",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 44.96644295,
+      "predictedValue": 36.68827133,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Tamil Nadu",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 27.32132808,
+      "predictedValue": 27.81331712,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Telangana",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 30.58954822,
+      "predictedValue": 37.18962879,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Tripura",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 39.10034602,
+      "predictedValue": 42.66470775,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Uttar Pradesh",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 52.37123252,
+      "predictedValue": 50.92045121,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "Uttarakhand",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 62.39267315,
+      "predictedValue": 60.13799861,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    },
+    {
+      "geographicLevel": "STATE_UT",
+      "geographicUnit": "West Bengal",
+      "parentUnit": "India",
+      "targetYear": 2024,
+      "actualValue": 48.72281419,
+      "predictedValue": 41.7395055,
+      "severityMetricUnit": "fatalities_per_100_accidents"
+    }
+  ]
+}

@@ -86,7 +86,62 @@ void main() {
       expect(response.providerAvailable, false);
       expect(response.events, isEmpty);
     });
+
+    test('parses direct unwrapped domain responses without outer data envelope', () async {
+      final interceptor = _DirectResponseInterceptor(<String, dynamic>{
+        'resolvedArea': 'Tamil Nadu',
+        'resolutionLevel': 'STATE_UT',
+        'retrievedAt': '2026-09-22T12:00:00Z',
+        'cached': false,
+        'providerAvailable': true,
+        'eventsCount': 1,
+        'events': [
+          {
+            'eventId': 'ev-tn-1',
+            'title': '[Test Fixture] Tamil Nadu Highway Advisory',
+            'description': 'Monsoon safety advisory for commuters.',
+            'sourceName': 'Regional Herald',
+            'sourceUrl': 'https://example.com/mock-news/tamil-nadu',
+            'publishedAt': '2026-09-22T11:00:00Z',
+            'category': 'GENERAL_SAFETY',
+            'severity': 'LOW',
+            'relevance': 'HIGH',
+            'areaName': 'Tamil Nadu',
+            'isVerifiedSource': true,
+            'relatedSourcesCount': 1,
+          }
+        ]
+      });
+
+      final repository = NewsRepository(_clientDirect(interceptor));
+      final response = await repository.fetchRecentSafetyNews();
+
+      expect(response.resolvedArea, 'Tamil Nadu');
+      expect(response.providerAvailable, true);
+      expect(response.eventsCount, 1);
+      expect(response.events.first.title, contains('Tamil Nadu'));
+    });
   });
+}
+
+GeoShieldApiClient _clientDirect(_DirectResponseInterceptor interceptor) {
+  final dio = Dio(BaseOptions(baseUrl: 'http://127.0.0.1:8080'));
+  dio.interceptors.add(interceptor);
+  return GeoShieldApiClient(_NoSessionStorage(), dio: dio);
+}
+
+class _DirectResponseInterceptor extends Interceptor {
+  _DirectResponseInterceptor(this._responseData);
+  final dynamic _responseData;
+
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    handler.resolve(Response<dynamic>(
+      requestOptions: options,
+      statusCode: 200,
+      data: _responseData,
+    ));
+  }
 }
 
 GeoShieldApiClient _client(_CapturingInterceptor interceptor) {

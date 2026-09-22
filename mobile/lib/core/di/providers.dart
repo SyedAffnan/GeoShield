@@ -8,6 +8,7 @@ import '../../features/auth/data/auth_repository.dart';
 import '../../features/incidents/data/incident_repository.dart';
 import '../../features/location/data/location_repository.dart';
 import '../../features/responder/data/responder_repository.dart';
+import '../../features/risk/data/historical_advisory_model.dart';
 import '../../features/risk/data/risk_repository.dart';
 import '../../features/sos/data/sos_outbox_store.dart';
 import '../../features/sos/data/sos_repository.dart';
@@ -131,6 +132,12 @@ final locationRepositoryProvider = Provider<LocationRepository>((ref) {
 
 final riskRepositoryProvider = Provider<RiskRepository>((ref) {
   return RiskRepository(ref.watch(apiClientProvider));
+});
+
+final historicalTrendAdvisoryProvider =
+    FutureProvider.autoDispose<HistoricalTrendAdvisoryModel>((ref) async {
+  final repo = ref.watch(riskRepositoryProvider);
+  return repo.getHistoricalTrendAdvisory();
 });
 
 final hazardGeometryProvider = Provider<HazardGeometryProvider>((ref) {

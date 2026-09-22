@@ -145,6 +145,7 @@ class GeoShieldApiClient implements ApiClient {
     if (responseBody is Map<String, dynamic>) {
       final data = responseBody['data'];
       if (data != null) return data;
+      return responseBody;
     }
     throw const NetworkException('Unexpected server response.');
   }

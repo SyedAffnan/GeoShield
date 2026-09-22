@@ -33,6 +33,8 @@ public class MockNewsProvider implements NewsProvider {
                 ? query.resolvedArea()
                 : "Shimla";
 
+        String areaSlug = area.toLowerCase().replaceAll("[^a-z0-9]+", "-").replaceAll("(^-|-$)", "");
+
         Instant now = Instant.now();
         List<RecentSafetyEventDto> events = new ArrayList<>();
 
@@ -45,7 +47,7 @@ public class MockNewsProvider implements NewsProvider {
                 "[Test Fixture] " + area + " National Highway blocked after heavy rockfall",
                 "Traffic authorities in " + area + " report a major landslide near the bypass. Clearing operations are underway and traffic is diverted.",
                 "Regional Herald",
-                "https://example.com/mock-news/landslide-" + area.toLowerCase(),
+                "https://example.com/mock-news/landslide-" + areaSlug,
                 null,
                 time1,
                 now,
@@ -66,7 +68,7 @@ public class MockNewsProvider implements NewsProvider {
                 "[Test Fixture] Bus and truck collision on outer ring road in " + area,
                 "A tourist transport bus and goods carrier collided near " + area + " outer ring road. Two passengers hospitalized with non-life-threatening injuries.",
                 "State Chronicle",
-                "https://example.com/mock-news/accident-" + area.toLowerCase(),
+                "https://example.com/mock-news/accident-" + areaSlug,
                 null,
                 time2,
                 now,
@@ -77,6 +79,31 @@ public class MockNewsProvider implements NewsProvider {
                 true,
                 1
         ));
+
+        // Fixture 3: Informational general safety advisory
+        Instant time3 = now.minus(Duration.ofHours(14));
+        UUID id3 = UUID.nameUUIDFromBytes(("mock-3-" + area).getBytes(StandardCharsets.UTF_8));
+        events.add(new RecentSafetyEventDto(
+                id3,
+                "grp-mock-3",
+                "[Test Fixture] Travel advisory issued for heavy rainfall and waterlogging in " + area,
+                "Local disaster management authorities in " + area + " advise tourists to check route advisories and exercise caution on hilly or low-lying sections.",
+                "Weather Sentinel",
+                "https://example.com/mock-news/travel-advisory-" + areaSlug,
+                null,
+                time3,
+                now,
+                SafetyEventCategory.GENERAL_SAFETY,
+                EventSeverity.LOW,
+                RelevanceTier.HIGH,
+                area,
+                true,
+                1
+        ));
+
+        if (query.category() != null) {
+            events.removeIf(e -> e.category() != query.category());
+        }
 
         return events;
     }

@@ -185,4 +185,25 @@ class NewsServiceImplTest {
         assertThat(response.eventsCount()).isEqualTo(0);
         verify(gNewsProvider).fetchSafetyNews(any());
     }
+
+    @Test
+    @DisplayName("When using mock provider, returns multiple distinct fixtures with valid URL slugs and respects category filter")
+    void mockProvider_returnsMultipleFixtures_andFiltersByCategory() {
+        NewsQuery generalQuery = new NewsQuery(null, null, "Tamil Nadu", null, null, null, null, 10);
+        NewsResponse generalResponse = newsService.getRecentSafetyNews(generalQuery);
+
+        assertThat(generalResponse.providerAvailable()).isTrue();
+        assertThat(generalResponse.events()).hasSize(3);
+        assertThat(generalResponse.events().get(0).sourceUrl()).doesNotContain(" ");
+        assertThat(generalResponse.events().get(0).title()).contains("Tamil Nadu");
+
+        newsService.clearCache();
+
+        NewsQuery trafficQuery = new NewsQuery(null, null, "Tamil Nadu", null, null, null, com.geoshield.news.dto.SafetyEventCategory.TRAFFIC_AND_TRANSIT, 10);
+        NewsResponse trafficResponse = newsService.getRecentSafetyNews(trafficQuery);
+
+        assertThat(trafficResponse.providerAvailable()).isTrue();
+        assertThat(trafficResponse.events()).hasSize(1);
+        assertThat(trafficResponse.events().get(0).category()).isEqualTo(com.geoshield.news.dto.SafetyEventCategory.TRAFFIC_AND_TRANSIT);
+    }
 }
