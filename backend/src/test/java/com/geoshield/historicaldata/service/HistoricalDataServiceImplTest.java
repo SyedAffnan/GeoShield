@@ -39,8 +39,8 @@ class HistoricalDataServiceImplTest {
     void persistsValidMorthRecordWithFixedHistoricalSourceType() {
         HistoricalSafetyRecordDraft draft = draft(HistoricalDataset.MORTH_ROAD_ACCIDENTS_2024, false, BigDecimal.valueOf(10));
         HistoricalDataServiceImpl service = service(HistoricalDataset.MORTH_ROAD_ACCIDENTS_2024, List.of(draft));
-        when(repository.findBySourceAndSourceYearAndGeographicLevelAndGeographicUnitAndCategoryAndMetricName(
-                anyString(), anyInt(), any(), anyString(), anyString(), anyString())).thenReturn(Optional.empty());
+        when(repository.findBySourceAndSourceYearAndGeographicLevelAndParentUnitAndGeographicUnitAndCategoryAndMetricName(
+                anyString(), anyInt(), any(), anyString(), anyString(), anyString(), anyString())).thenReturn(Optional.empty());
 
         HistoricalDataImportResult result = service.importDataset(HistoricalDataset.MORTH_ROAD_ACCIDENTS_2024, Path.of("ignored.csv"));
 
@@ -55,8 +55,8 @@ class HistoricalDataServiceImplTest {
     void skipsExistingNaturalKeyForRepeatSafeImport() {
         HistoricalSafetyRecordDraft draft = draft(HistoricalDataset.MORTH_ROAD_ACCIDENTS_2024, false, BigDecimal.ONE);
         HistoricalDataServiceImpl service = service(HistoricalDataset.MORTH_ROAD_ACCIDENTS_2024, List.of(draft));
-        when(repository.findBySourceAndSourceYearAndGeographicLevelAndGeographicUnitAndCategoryAndMetricName(
-                anyString(), anyInt(), any(), anyString(), anyString(), anyString())).thenReturn(Optional.of(existingRecord()));
+        when(repository.findBySourceAndSourceYearAndGeographicLevelAndParentUnitAndGeographicUnitAndCategoryAndMetricName(
+                anyString(), anyInt(), any(), anyString(), anyString(), anyString(), anyString())).thenReturn(Optional.of(existingRecord()));
 
         HistoricalDataImportResult result = service.importDataset(HistoricalDataset.MORTH_ROAD_ACCIDENTS_2024, Path.of("ignored.csv"));
 

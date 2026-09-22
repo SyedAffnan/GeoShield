@@ -46,6 +46,7 @@ geoshield:
     low-max: ${GEOSHIELD_RISK_LOW_MAX:39}
     medium-max: ${GEOSHIELD_RISK_MEDIUM_MAX:59}
     high-max: ${GEOSHIELD_RISK_HIGH_MAX:79}
+    district-evaluation-enabled: ${GEOSHIELD_RISK_DISTRICT_EVALUATION_ENABLED:false}
   weather:
     # Open-Meteo is the selected provider for Architecture v3.2 architecture-open item 1.
     # It needs no API key or account, so there is no weather credential to store or rotate.

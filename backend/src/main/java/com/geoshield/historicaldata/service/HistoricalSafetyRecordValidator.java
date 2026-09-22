@@ -1,6 +1,7 @@
 package com.geoshield.historicaldata.service;
 
 import com.geoshield.common.exception.ValidationException;
+import com.geoshield.historicaldata.entity.GeographicLevel;
 import com.geoshield.historicaldata.ingestion.HistoricalDataset;
 import com.geoshield.historicaldata.ingestion.HistoricalSafetyRecordDraft;
 import java.time.Year;
@@ -16,7 +17,17 @@ class HistoricalSafetyRecordValidator {
         if (record.geographicLevel() == null) {
             throw new ValidationException("geographicLevel is required");
         }
+        required(record.parentUnit(), "parentUnit");
         required(record.geographicUnit(), "geographicUnit");
+        if (record.geographicLevel() == GeographicLevel.NATIONAL || record.geographicLevel() == GeographicLevel.STATE_UT) {
+            if (!"India".equalsIgnoreCase(record.parentUnit())) {
+                throw new ValidationException("parentUnit must be India for NATIONAL and STATE_UT records");
+            }
+        } else if (record.geographicLevel() == GeographicLevel.DISTRICT) {
+            if ("India".equalsIgnoreCase(record.parentUnit()) || record.parentUnit().equalsIgnoreCase(record.geographicUnit())) {
+                throw new ValidationException("parentUnit for DISTRICT must be the canonical parent State/UT name");
+            }
+        }
         required(record.category(), "category");
         required(record.metricName(), "metricName");
         if (record.metricValue() == null || record.metricValue().signum() < 0) {

@@ -42,7 +42,7 @@ public class MorthHistoricalDataImporter implements HistoricalDataImporter {
                 }
                 BigDecimal metricValue = numeric(value, metricColumn);
                 records.add(new HistoricalSafetyRecordDraft(dataset().source(), dataset().sourceYear(), geographicLevel,
-                        normalizedUnit, CATEGORY, metricColumn, metricValue, false));
+                        "India", normalizedUnit, CATEGORY, metricColumn, metricValue, false));
                 rowMetrics++;
             }
             if (rowMetrics == 0) {

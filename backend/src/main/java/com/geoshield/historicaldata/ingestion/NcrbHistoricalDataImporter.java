@@ -35,7 +35,7 @@ public class NcrbHistoricalDataImporter implements HistoricalDataImporter {
 
     private HistoricalSafetyRecordDraft record(String crimeHead, String metricName, String value, boolean touristSpecific) {
         return new HistoricalSafetyRecordDraft(dataset().source(), dataset().sourceYear(), GeographicLevel.NATIONAL,
-                "India", crimeHead, metricName, numeric(value, metricName), touristSpecific);
+                "India", "India", crimeHead, metricName, numeric(value, metricName), touristSpecific);
     }
 
     private String required(Map<String, String> row, String column) {

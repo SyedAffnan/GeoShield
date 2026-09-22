@@ -7,10 +7,20 @@ import com.geoshield.historicaldata.entity.GeographicLevel;
 import com.geoshield.historicaldata.ingestion.HistoricalDataset;
 import java.nio.file.Path;
 
+import com.geoshield.historicaldata.dto.HistoricalMetricResult;
+import java.util.List;
+
 public interface HistoricalDataService extends ModuleService {
     HistoricalDataImportResult importDataset(HistoricalDataset dataset, Path sourceFile);
     boolean hasHistoricalSafetyRecords();
-    java.util.List<HistoricalSafetyRecordSummary> getHistoricalSafetyRecords(GeographicLevel geographicLevel);
+    List<HistoricalSafetyRecordSummary> getHistoricalSafetyRecords(GeographicLevel geographicLevel);
+    List<HistoricalSafetyRecordSummary> getHistoricalSafetyRecords(GeographicLevel geographicLevel, String parentUnit);
 
-    // TODO(architecture-open): add approved geographically resolved risk-feature query contracts.
+    HistoricalMetricResult getSafetyMetricWithFallback(
+            GeographicLevel targetLevel,
+            String parentUnit,
+            String targetUnit,
+            String source,
+            int sourceYear,
+            String metricNamePattern);
 }
