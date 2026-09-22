@@ -65,7 +65,7 @@ class RiskDecisionAuditInstrumentationTest {
 
     @BeforeEach
     void setUp() {
-        objectMapper = new ObjectMapper();
+        objectMapper = new ObjectMapper().findAndRegisterModules();
         userId = UUID.randomUUID();
         riskApiService = new RiskApiServiceImpl(
                 riskContextAssembler,

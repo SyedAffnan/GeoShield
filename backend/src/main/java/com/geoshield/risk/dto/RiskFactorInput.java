@@ -1,6 +1,7 @@
 package com.geoshield.risk.dto;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 
 /** A score is accepted only when its producing source is explicitly available. */
 public record RiskFactorInput(
@@ -9,7 +10,13 @@ public record RiskFactorInput(
         String unavailabilityReason,
         String reasonCode,
         String rawValue,
-        String source) {
+        String source,
+        String sourceType,
+        String sourceIdentifier,
+        Instant observedAt,
+        Long freshnessSeconds,
+        String geographicScope,
+        String normalizationDetails) {
 
     public RiskFactorInput {
         if (available && normalizedRisk == null) {
@@ -30,6 +37,17 @@ public record RiskFactorInput(
         }
     }
 
+    public RiskFactorInput(
+            BigDecimal normalizedRisk,
+            boolean available,
+            String unavailabilityReason,
+            String reasonCode,
+            String rawValue,
+            String source) {
+        this(normalizedRisk, available, unavailabilityReason, reasonCode, rawValue, source,
+                null, null, null, null, null, null);
+    }
+
     public RiskFactorInput(BigDecimal normalizedRisk, boolean available, String unavailabilityReason) {
         this(normalizedRisk, available, unavailabilityReason, null, null, null);
     }
@@ -46,6 +64,20 @@ public record RiskFactorInput(
         return new RiskFactorInput(normalizedRisk, true, null, null, rawValue, source);
     }
 
+    public static RiskFactorInput available(
+            BigDecimal normalizedRisk,
+            String rawValue,
+            String source,
+            String sourceType,
+            String sourceIdentifier,
+            Instant observedAt,
+            Long freshnessSeconds,
+            String geographicScope,
+            String normalizationDetails) {
+        return new RiskFactorInput(normalizedRisk, true, null, null, rawValue, source,
+                sourceType, sourceIdentifier, observedAt, freshnessSeconds, geographicScope, normalizationDetails);
+    }
+
     public static RiskFactorInput unavailable() {
         return unavailable("No approved source data is currently available.");
     }
@@ -56,5 +88,19 @@ public record RiskFactorInput(
 
     public static RiskFactorInput unavailable(String reason, String reasonCode, String source) {
         return new RiskFactorInput(null, false, reason, reasonCode, null, source);
+    }
+
+    public static RiskFactorInput unavailable(
+            String reason,
+            String reasonCode,
+            String source,
+            String sourceType,
+            String sourceIdentifier,
+            Instant observedAt,
+            Long freshnessSeconds,
+            String geographicScope,
+            String normalizationDetails) {
+        return new RiskFactorInput(null, false, reason, reasonCode, null, source,
+                sourceType, sourceIdentifier, observedAt, freshnessSeconds, geographicScope, normalizationDetails);
     }
 }

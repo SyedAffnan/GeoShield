@@ -76,6 +76,19 @@ public class RiskContextAssembler {
     }
 
     private NormalizedRiskFeature unavailable(RiskFactorType type, String source, String reason) {
-        return NormalizedRiskFeature.unavailable(type, source, reason, "No approved normalization is configured.");
+        String reasonCode = NormalizedRiskFeature.defaultReasonCode(type, reason);
+        return NormalizedRiskFeature.unavailable(
+                type,
+                source,
+                reason,
+                "No approved normalization is configured.",
+                reasonCode,
+                null,
+                "DORMANT",
+                null,
+                null,
+                null,
+                "N/A",
+                "No approved normalization is configured.");
     }
 }

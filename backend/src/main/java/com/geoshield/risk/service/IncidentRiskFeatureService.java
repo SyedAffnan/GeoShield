@@ -8,27 +8,34 @@ import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /**
- * Calculates the normalized real-time user-report risk feature from actual stored incidents.
+ * Calculates the normalized real-time user-report risk feature from actual stored incidents
+ * with full provenance traceability.
  *
  * <p>The feature evaluates active incidents within a defined spatial radius (10 km) and temporal
  * window (24 hours) relative to the tourist's current location, decaying risk linearly with
  * distance and elapsed time. Incident severity is determined from the reported incident type,
  * and status weighting accounts for active emergency response progress.
+ *
+ * <p>Calculation uses the tourist's precise coordinates for spatial distance lookup, while provenance
+ * records the privacy-preserving grid representation.
  */
 @Service
 public class IncidentRiskFeatureService {
     public static final double MAX_DISTANCE_KM = 10.0;
     public static final double MAX_AGE_HOURS = 24.0;
-    private static final double EARTH_RADIUS_KM = 6371.0;
-    private static final String SOURCE = "GeoShield Incident Reports";
-    private static final String NORMALIZATION =
+    public static final String SOURCE = "GeoShield Incident Reports";
+    public static final String SOURCE_TYPE = "USER_INCIDENTS";
+    public static final String NORMALIZATION =
             "Sum of distance- and recency-decayed active incident severities within 10 km and 24h, clamped to [0, 100]";
+
+    private static final double EARTH_RADIUS_KM = 6371.0;
 
     private final Clock clock;
 
@@ -54,21 +61,47 @@ public class IncidentRiskFeatureService {
      */
     public NormalizedRiskFeature userReportRisk(List<IncidentResponse> incidents, BigDecimal latitude,
             BigDecimal longitude, Instant now) {
+        String scope = GeographicProvenanceUtil.toRadiusAroundLocationGrid(latitude, longitude, MAX_DISTANCE_KM);
         if (latitude == null || longitude == null) {
-            return NormalizedRiskFeature.unavailable(RiskFactorType.USER_REPORT, SOURCE,
+            return NormalizedRiskFeature.unavailable(
+                    RiskFactorType.USER_REPORT,
+                    SOURCE,
                     "No current location is available to determine spatial incident relevance.",
+                    "Requires tourist coordinates to calculate spatial proximity; no score is synthesized.",
+                    "INCIDENT_DATA_UNAVAILABLE",
+                    null,
+                    SOURCE_TYPE,
+                    null,
+                    null,
+                    null,
+                    scope,
                     "Requires tourist coordinates to calculate spatial proximity; no score is synthesized.");
         }
 
         if (incidents == null || incidents.isEmpty()) {
-            return new NormalizedRiskFeature(RiskFactorType.USER_REPORT,
-                    BigDecimal.ZERO.setScale(8, RoundingMode.HALF_UP), true, SOURCE,
+            String sourceId = String.format(Locale.ROOT,
+                    "QUERY(radius=%.1fkm,window=%.1fh,status=[REPORTED,ACKNOWLEDGED,RESPONDING],matched=0)",
+                    MAX_DISTANCE_KM, MAX_AGE_HOURS);
+            return new NormalizedRiskFeature(
+                    RiskFactorType.USER_REPORT,
+                    BigDecimal.ZERO.setScale(8, RoundingMode.HALF_UP),
+                    true,
+                    SOURCE,
                     "No active user-reported incidents found within " + MAX_DISTANCE_KM + " km in the last 24 hours.",
+                    NORMALIZATION,
+                    null,
+                    "0 active incidents",
+                    SOURCE_TYPE,
+                    sourceId,
+                    null,
+                    null,
+                    scope,
                     NORMALIZATION);
         }
 
         double accumulatedRisk = 0.0;
         int relevantCount = 0;
+        List<IncidentResponse> contributing = new ArrayList<>();
 
         for (IncidentResponse incident : incidents) {
             if (incident.latitude() == null || incident.longitude() == null) {
@@ -100,6 +133,7 @@ public class IncidentRiskFeatureService {
             double incidentScore = baseSeverity * spatialWeight * temporalWeight * statusWeight;
             accumulatedRisk += incidentScore;
             relevantCount++;
+            contributing.add(incident);
         }
 
         double clampedScore = Math.min(100.0, Math.max(0.0, accumulatedRisk));
@@ -111,7 +145,67 @@ public class IncidentRiskFeatureService {
                         + " km; aggregated raw severity is " + String.format(Locale.ROOT, "%.2f", accumulatedRisk)
                         + " (clamped to [0, 100]).";
 
-        return new NormalizedRiskFeature(RiskFactorType.USER_REPORT, normalizedValue, true, SOURCE, reason, NORMALIZATION);
+        String sourceId;
+        Instant observedAt = null;
+        Long freshnessSeconds = null;
+
+        if (relevantCount > 0) {
+            // Sort deterministically: newest first, tie-break by incidentId
+            contributing.sort((a, b) -> {
+                Instant ta = a.reportedAt() != null ? a.reportedAt() : Instant.EPOCH;
+                Instant tb = b.reportedAt() != null ? b.reportedAt() : Instant.EPOCH;
+                int cmp = tb.compareTo(ta);
+                if (cmp != 0) return cmp;
+                return a.incidentId().compareTo(b.incidentId());
+            });
+
+            observedAt = contributing.get(0).reportedAt();
+            if (observedAt != null) {
+                freshnessSeconds = Math.max(0L, Duration.between(observedAt, now).getSeconds());
+            }
+
+            int limit = Math.min(5, contributing.size());
+            StringBuilder idsSb = new StringBuilder();
+            for (int i = 0; i < limit; i++) {
+                if (i > 0) idsSb.append(",");
+                idsSb.append(contributing.get(i).incidentId());
+            }
+            if (contributing.size() > 5) {
+                idsSb.append(",...+").append(contributing.size() - 5).append("_more");
+            }
+
+            sourceId = String.format(Locale.ROOT,
+                    "QUERY(radius=%.1fkm,window=%.1fh,status=[REPORTED,ACKNOWLEDGED,RESPONDING],matched=%d,ids=[%s])",
+                    MAX_DISTANCE_KM, MAX_AGE_HOURS, relevantCount, idsSb.toString());
+        } else {
+            sourceId = String.format(Locale.ROOT,
+                    "QUERY(radius=%.1fkm,window=%.1fh,status=[REPORTED,ACKNOWLEDGED,RESPONDING],matched=0)",
+                    MAX_DISTANCE_KM, MAX_AGE_HOURS);
+        }
+
+        String rawValue = relevantCount == 0
+                ? "0 active incidents"
+                : String.format(Locale.ROOT, "%d active incident(s), raw score %.2f", relevantCount, accumulatedRisk);
+
+        String normDetails = relevantCount == 0
+                ? NORMALIZATION
+                : String.format(Locale.ROOT, "raw severity %.2f clamped to [0, 100] = %.2f", accumulatedRisk, clampedScore);
+
+        return new NormalizedRiskFeature(
+                RiskFactorType.USER_REPORT,
+                normalizedValue,
+                true,
+                SOURCE,
+                reason,
+                NORMALIZATION,
+                null,
+                rawValue,
+                SOURCE_TYPE,
+                sourceId,
+                observedAt,
+                freshnessSeconds,
+                scope,
+                normDetails);
     }
 
     /**

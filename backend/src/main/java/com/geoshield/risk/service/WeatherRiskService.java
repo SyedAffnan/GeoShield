@@ -10,11 +10,14 @@ import com.geoshield.risk.weather.WeatherObservationProvider;
 import com.geoshield.risk.weather.WeatherObservationResult;
 import com.geoshield.risk.weather.WmoWeatherCodeMapper;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Duration;
 import java.util.Optional;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /**
- * Turns a live weather observation into the normalized weather risk feature.
+ * Turns a live weather observation into the normalized weather risk feature with full provenance.
  *
  * <p>Composes two real sources and adds nothing of its own: the observation comes from a
  * {@link WeatherObservationProvider}, and the risk relationship comes from the published
@@ -34,13 +37,24 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class WeatherRiskService {
+    public static final String SOURCE_TYPE = "EXTERNAL_API";
+
     private final WeatherObservationProvider observationProvider;
     private final MorthWeatherSeverityTable severityTable;
+    private final Clock clock;
+
+    @Autowired
+    public WeatherRiskService(WeatherObservationProvider observationProvider,
+            MorthWeatherSeverityTable severityTable,
+            @Autowired(required = false) Clock clock) {
+        this.observationProvider = observationProvider;
+        this.severityTable = severityTable;
+        this.clock = clock != null ? clock : Clock.systemUTC();
+    }
 
     public WeatherRiskService(WeatherObservationProvider observationProvider,
             MorthWeatherSeverityTable severityTable) {
-        this.observationProvider = observationProvider;
-        this.severityTable = severityTable;
+        this(observationProvider, severityTable, Clock.systemUTC());
     }
 
     /**
@@ -50,32 +64,64 @@ public class WeatherRiskService {
      * @param longitude current longitude, or {@code null} when no location is stored
      */
     public NormalizedRiskFeature currentRisk(BigDecimal latitude, BigDecimal longitude) {
+        String scope = GeographicProvenanceUtil.toLocationGrid(latitude, longitude);
         if (latitude == null || longitude == null) {
             return unavailable("No current location is available, so no weather observation can be"
-                    + " requested for it.");
+                    + " requested for it.", scope);
         }
         if (!severityTable.isLoaded()) {
-            return unavailable(severityTable.unavailabilityReason());
+            return unavailable(severityTable.unavailabilityReason(), scope);
         }
         WeatherObservationResult result = observationProvider.currentWeather(latitude, longitude);
         if (!result.available()) {
-            return unavailable(result.unavailabilityReason());
+            return unavailable(result.unavailabilityReason(), scope);
         }
         WeatherObservation observation = result.observation();
         Optional<WeatherCategory> category = WmoWeatherCodeMapper.categoryOf(observation.wmoCode());
         if (category.isEmpty()) {
             return unavailable(observation.provider() + " reported WMO weather code "
                     + observation.wmoCode() + ", which is outside the documented mapping onto MoRTH's"
-                    + " published weather conditions. No category is assumed.");
+                    + " published weather conditions. No category is assumed.", scope);
         }
         Optional<WeatherConditionSeverity> severity = severityTable.severityOf(category.get());
         if (severity.isEmpty()) {
             return unavailable("MoRTH Table 3.8 publishes no accident severity for the \""
-                    + category.get().publishedLabel() + "\" condition, so no risk value exists for it.");
+                    + category.get().publishedLabel() + "\" condition, so no risk value exists for it.", scope);
         }
-        return new NormalizedRiskFeature(RiskFactorType.WEATHER, severity.get().normalizedRisk(), true,
-                source(observation), explain(observation, severity.get()),
-                MorthWeatherSeverityTable.NORMALIZATION);
+
+        Long freshness = null;
+        String normDetails = MorthWeatherSeverityTable.NORMALIZATION;
+        if (observation.observedAt() != null) {
+            Duration age = Duration.between(observation.observedAt(), clock.instant());
+            long ageSec = age.getSeconds();
+            if (ageSec < 0) {
+                freshness = 0L;
+                if (ageSec < -60) {
+                    normDetails = normDetails + " [CLOCK_DRIFT_DETECTED]";
+                }
+            } else {
+                freshness = ageSec;
+            }
+        }
+
+        String rawValue = "WMO " + observation.wmoCode() + " (" + severity.get().label() + ")";
+        String sourceId = observation.provider() + "-WMO-" + observation.wmoCode();
+
+        return new NormalizedRiskFeature(
+                RiskFactorType.WEATHER,
+                severity.get().normalizedRisk(),
+                true,
+                source(observation),
+                explain(observation, severity.get()),
+                MorthWeatherSeverityTable.NORMALIZATION,
+                null,
+                rawValue,
+                SOURCE_TYPE,
+                sourceId,
+                observation.observedAt(),
+                freshness,
+                scope,
+                normDetails);
     }
 
     /** Names both real sources: who observed the weather, and who published the risk relationship. */
@@ -97,11 +143,22 @@ public class WeatherRiskService {
                 + "; not State/UT-specific and not tourist-specific.";
     }
 
-    private NormalizedRiskFeature unavailable(String reason) {
-        return NormalizedRiskFeature.unavailable(RiskFactorType.WEATHER,
+    private NormalizedRiskFeature unavailable(String reason, String scope) {
+        String reasonCode = NormalizedRiskFeature.defaultReasonCode(RiskFactorType.WEATHER, reason);
+        return NormalizedRiskFeature.unavailable(
+                RiskFactorType.WEATHER,
                 observationProvider.providerName() + " current weather observation; risk mapping from "
                         + MorthWeatherSeverityTable.SOURCE,
-                reason, "Requires a real current weather observation mapped onto a published MoRTH"
-                        + " weather condition; no score is synthesized.");
+                reason,
+                "Requires a real current weather observation mapped onto a published MoRTH"
+                        + " weather condition; no score is synthesized.",
+                reasonCode,
+                null,
+                SOURCE_TYPE,
+                null,
+                null,
+                null,
+                scope,
+                "Requires a real current weather observation mapped onto a published MoRTH weather condition; no score is synthesized.");
     }
 }

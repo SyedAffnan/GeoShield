@@ -70,6 +70,12 @@ class RiskFactorDetailModel {
     this.reason,
     this.explanation,
     this.source,
+    this.sourceType,
+    this.sourceIdentifier,
+    this.observedAt,
+    this.freshnessSeconds,
+    this.geographicScope,
+    this.normalizationDetails,
   });
   final String factor;
   final double weight;
@@ -80,6 +86,12 @@ class RiskFactorDetailModel {
   final String? reason;
   final String? explanation;
   final String? source;
+  final String? sourceType;
+  final String? sourceIdentifier;
+  final DateTime? observedAt;
+  final int? freshnessSeconds;
+  final String? geographicScope;
+  final String? normalizationDetails;
 
   factory RiskFactorDetailModel.fromJson(Map<String, dynamic> json) =>
       RiskFactorDetailModel(
@@ -93,6 +105,14 @@ class RiskFactorDetailModel {
         reason: json['reason'] as String?,
         explanation: json['explanation'] as String?,
         source: json['source'] as String?,
+        sourceType: json['sourceType'] as String?,
+        sourceIdentifier: json['sourceIdentifier'] as String?,
+        observedAt: json['observedAt'] != null
+            ? DateTime.tryParse(json['observedAt'].toString())
+            : null,
+        freshnessSeconds: (json['freshnessSeconds'] as num?)?.toInt(),
+        geographicScope: json['geographicScope'] as String?,
+        normalizationDetails: json['normalizationDetails'] as String?,
       );
 }
 

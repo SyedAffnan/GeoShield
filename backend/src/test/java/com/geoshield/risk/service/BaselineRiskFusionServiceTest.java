@@ -39,7 +39,7 @@ class BaselineRiskFusionServiceTest {
     @BeforeEach
     void setUp() {
         userId = UUID.randomUUID();
-        service = new BaselineRiskFusionService(properties(), identityService, riskScoreRepository, new ObjectMapper());
+        service = new BaselineRiskFusionService(properties(), identityService, riskScoreRepository, new ObjectMapper().findAndRegisterModules());
         lenient().when(identityService.getUserById(userId)).thenReturn(user);
     }
 

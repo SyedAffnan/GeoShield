@@ -1,6 +1,7 @@
 package com.geoshield.risk.dto;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.Locale;
 
 /** Provenance-preserving normalized feature contract for baseline and future AI consumers. */
@@ -12,7 +13,26 @@ public record NormalizedRiskFeature(
         String reason,
         String normalization,
         String reasonCode,
-        String rawValue) {
+        String rawValue,
+        String sourceType,
+        String sourceIdentifier,
+        Instant observedAt,
+        Long freshnessSeconds,
+        String geographicScope,
+        String normalizationDetails) {
+
+    public NormalizedRiskFeature(
+            RiskFactorType factor,
+            BigDecimal value,
+            boolean available,
+            String source,
+            String reason,
+            String normalization,
+            String reasonCode,
+            String rawValue) {
+        this(factor, value, available, source, reason, normalization, reasonCode, rawValue,
+                null, null, null, null, null, normalization);
+    }
 
     public NormalizedRiskFeature(
             RiskFactorType factor,
@@ -21,14 +41,16 @@ public record NormalizedRiskFeature(
             String source,
             String reason,
             String normalization) {
-        this(factor, value, available, source, reason, normalization, null, null);
+        this(factor, value, available, source, reason, normalization, null, null,
+                null, null, null, null, null, normalization);
     }
 
     public RiskFactorInput toRiskFactorInput() {
         String effectiveReasonCode = available ? null : (reasonCode != null ? reasonCode : defaultReasonCode(factor, reason));
+        String effectiveNorm = normalizationDetails != null ? normalizationDetails : normalization;
         return available
-                ? RiskFactorInput.available(value, rawValue, source)
-                : RiskFactorInput.unavailable(reason, effectiveReasonCode, source);
+                ? RiskFactorInput.available(value, rawValue, source, sourceType, sourceIdentifier, observedAt, freshnessSeconds, geographicScope, effectiveNorm)
+                : RiskFactorInput.unavailable(reason, effectiveReasonCode, source, sourceType, sourceIdentifier, observedAt, freshnessSeconds, geographicScope, effectiveNorm);
     }
 
     public static NormalizedRiskFeature unavailable(
@@ -36,7 +58,8 @@ public record NormalizedRiskFeature(
             String source,
             String reason,
             String normalization) {
-        return new NormalizedRiskFeature(factor, null, false, source, reason, normalization, null, null);
+        return new NormalizedRiskFeature(factor, null, false, source, reason, normalization, null, null,
+                null, null, null, null, null, normalization);
     }
 
     public static NormalizedRiskFeature unavailable(
@@ -45,7 +68,25 @@ public record NormalizedRiskFeature(
             String reason,
             String normalization,
             String reasonCode) {
-        return new NormalizedRiskFeature(factor, null, false, source, reason, normalization, reasonCode, null);
+        return new NormalizedRiskFeature(factor, null, false, source, reason, normalization, reasonCode, null,
+                null, null, null, null, null, normalization);
+    }
+
+    public static NormalizedRiskFeature unavailable(
+            RiskFactorType factor,
+            String source,
+            String reason,
+            String normalization,
+            String reasonCode,
+            String rawValue,
+            String sourceType,
+            String sourceIdentifier,
+            Instant observedAt,
+            Long freshnessSeconds,
+            String geographicScope,
+            String normalizationDetails) {
+        return new NormalizedRiskFeature(factor, null, false, source, reason, normalization, reasonCode, rawValue,
+                sourceType, sourceIdentifier, observedAt, freshnessSeconds, geographicScope, normalizationDetails);
     }
 
     public static String defaultReasonCode(RiskFactorType factor, String reason) {

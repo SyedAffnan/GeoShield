@@ -669,6 +669,27 @@ class RiskFactorCard extends StatelessWidget {
                 style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
               ),
             ],
+            if (detail?.sourceIdentifier != null && detail!.sourceIdentifier!.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                'Source ID: ${detail!.sourceIdentifier}',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              ),
+            ],
+            if (detail?.geographicScope != null && detail!.geographicScope!.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                'Scope: ${detail!.geographicScope}',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              ),
+            ],
+            if (detail?.observedAt != null) ...[
+              const SizedBox(height: 2),
+              Text(
+                'Recorded: ${detail!.observedAt!.toUtc().toIso8601String()}${detail!.freshnessSeconds != null ? ' (${detail!.freshnessSeconds}s ago)' : ''}',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              ),
+            ],
             const SizedBox(height: 8),
             Text(factor.explanation),
           ]),

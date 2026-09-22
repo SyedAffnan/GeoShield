@@ -131,7 +131,13 @@ public class BaselineRiskFusionService implements RiskFusionService {
                     BigDecimal.ZERO,
                     reasonCode,
                     factorLabel(factor) + " is unavailable: " + input.unavailabilityReason(),
-                    input.source());
+                    input.source(),
+                    input.sourceType(),
+                    input.sourceIdentifier(),
+                    input.observedAt(),
+                    input.freshnessSeconds(),
+                    input.geographicScope(),
+                    input.normalizationDetails());
         }
         BigDecimal contribution = input.normalizedRisk().multiply(weight);
         return new RiskFactorDetail(
@@ -143,7 +149,13 @@ public class BaselineRiskFusionService implements RiskFusionService {
                 contribution,
                 null,
                 factorLabel(factor) + " contributed " + contribution.stripTrailingZeros().toPlainString() + " risk points.",
-                input.source());
+                input.source(),
+                input.sourceType(),
+                input.sourceIdentifier(),
+                input.observedAt(),
+                input.freshnessSeconds(),
+                input.geographicScope(),
+                input.normalizationDetails());
     }
 
     private void persist(java.util.UUID userId, BaselineRiskResult result) {

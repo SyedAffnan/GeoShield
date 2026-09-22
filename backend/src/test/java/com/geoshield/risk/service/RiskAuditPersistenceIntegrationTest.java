@@ -4,285 +4,427 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyDouble;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.geoshield.config.RiskFusionProperties;
-import com.geoshield.emergencyservices.service.EmergencyServicesService;
-import com.geoshield.historicaldata.dto.HistoricalSafetyRecordSummary;
 import com.geoshield.historicaldata.entity.GeographicLevel;
-import com.geoshield.historicaldata.service.HistoricalDataService;
+import com.geoshield.identity.entity.Role;
 import com.geoshield.identity.entity.User;
-import com.geoshield.identity.service.IdentityService;
-import com.geoshield.incident.service.IncidentService;
-import com.geoshield.location.dto.LocationResponse;
-import com.geoshield.location.service.LocationService;
-import com.geoshield.notification.dto.SachetAlertSummary;
-import com.geoshield.notification.service.SachetAlertService;
+import com.geoshield.identity.entity.UserRole;
+import com.geoshield.identity.repository.RoleRepository;
+import com.geoshield.identity.repository.UserRepository;
+import com.geoshield.risk.dto.RiskFactorDetail;
+import com.geoshield.risk.dto.RiskFactorType;
 import com.geoshield.risk.dto.RiskLevel;
-import com.geoshield.risk.dto.RiskResponse;
 import com.geoshield.risk.entity.RiskScore;
-import com.geoshield.risk.geo.StateBoundaryIndex;
+import com.geoshield.risk.entity.RiskScoringMethod;
 import com.geoshield.risk.repository.RiskScoreRepository;
-import com.geoshield.risk.timeofday.MorthTimeOfDayDistribution;
-import com.geoshield.risk.weather.MorthWeatherSeverityTable;
-import com.geoshield.risk.weather.WeatherObservation;
-import com.geoshield.risk.weather.WeatherObservationProvider;
-import com.geoshield.risk.weather.WeatherObservationResult;
 import java.math.BigDecimal;
-import java.time.Clock;
 import java.time.Instant;
-import java.time.ZoneOffset;
-import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
+import org.springframework.boot.test.context.SpringBootTest;
 
 /**
- * End-to-end integration test validating real risk computation and audit persistence.
+ * Real MySQL database integration test verifying RiskScore audit persistence,
+ * native JSON column mapping (factor_details, contributing_factors, data_completeness),
+ * Step 4 provenance metadata round-tripping, and legacy compatibility.
  *
- * <p>Crucially, {@link BaselineRiskFusionService} and {@link RiskContextAssembler} are NOT mocked.
- * Real feature services, real geographic resolution, real fusion calculations, and real
- * {@link RiskApiServiceImpl} execution are exercised together, verifying that unique decisionId
- * generation, baseline calculation, SACHET promotion, and audit record details are properly passed
- * to {@link RiskScoreRepository#save(RiskScore)}.
+ * <p>Tagged with {@code @Tag("integration")} and enabled conditionally via
+ * {@code @EnabledIfEnvironmentVariable(named = "GEOSHIELD_DB_PASSWORD", matches = ".+")}.
+ * Crucially, this does NOT use Mockito to fake persistence; it runs against the live target
+ * MySQL database to verify that:
+ * <ul>
+ *   <li>RiskScore entity persists into MySQL's native JSON columns;</li>
+ *   <li>All 6 Step 4 provenance fields serialize and deserialize correctly;</li>
+ *   <li>Instant timestamps round-trip without corruption or timezone distortion;</li>
+ *   <li>Null fields serialize faithfully without breaking schema validation;</li>
+ *   <li>Payload fits the actual database column definition;</li>
+ *   <li>Legacy factor_details payloads remain readable without regression.</li>
+ * </ul>
  */
-@ExtendWith(MockitoExtension.class)
+@Tag("integration")
+@SpringBootTest(properties = {
+        "geoshield.jwt.secret=integration-test-secret-at-least-32-bytes-long-123456"
+})
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@EnabledIfEnvironmentVariable(named = "GEOSHIELD_DB_PASSWORD", matches = ".+")
 class RiskAuditPersistenceIntegrationTest {
 
-    // Bengaluru, Karnataka coordinates
-    private static final BigDecimal LATITUDE = new BigDecimal("12.9716");
-    private static final BigDecimal LONGITUDE = new BigDecimal("77.5946");
-    private static final Instant FIXED_INSTANT = Instant.parse("2026-08-24T10:00:00Z");
+    @Autowired
+    private RiskScoreRepository riskScoreRepository;
 
-    private static StateBoundaryIndex boundaryIndex;
+    @Autowired
+    private UserRepository userRepository;
 
-    @Mock private HistoricalDataService historicalDataService;
-    @Mock private LocationService locationService;
-    @Mock private IncidentService incidentService;
-    @Mock private SachetAlertService sachetAlertService;
-    @Mock private EmergencyServicesService emergencyServicesService;
-    @Mock private IdentityService identityService;
-    @Mock private RiskScoreRepository riskScoreRepository;
-    @Mock private User user;
+    @Autowired
+    private RoleRepository roleRepository;
 
+    @Autowired
     private ObjectMapper objectMapper;
-    private BaselineRiskFusionService realRiskFusionService;
-    private RiskApiServiceImpl realRiskApiService;
-    private UUID userId;
-    private Map<UUID, RiskScore> storedScores;
 
-    @BeforeAll
-    static void loadBoundariesOnce() {
-        boundaryIndex = new StateBoundaryIndex();
+    private User testTourist;
+    private final List<UUID> createdDecisionIds = new ArrayList<>();
+
+    private UserRole getOrCreateTouristRole() {
+        return roleRepository.findByName(Role.TOURIST)
+                .orElseGet(() -> roleRepository.save(new UserRole(Role.TOURIST)));
     }
 
     @BeforeEach
     void setUp() {
-        userId = UUID.randomUUID();
-        objectMapper = new ObjectMapper();
-        storedScores = new ConcurrentHashMap<>();
-
-        // Repository contract: store and retrieve by decisionId
-        lenient().when(riskScoreRepository.save(any(RiskScore.class))).thenAnswer(invocation -> {
-            RiskScore s = invocation.getArgument(0);
-            storedScores.put(s.getDecisionId(), s);
-            return s;
-        });
-        lenient().when(riskScoreRepository.findByDecisionId(any(UUID.class))).thenAnswer(invocation -> {
-            UUID id = invocation.getArgument(0);
-            return Optional.ofNullable(storedScores.get(id));
-        });
-
-        // Identity contract
-        lenient().when(identityService.getUserById(userId)).thenReturn(user);
-
-        // Location contract
-        lenient().when(locationService.getCurrentLocation(userId)).thenReturn(
-                new LocationResponse(1L, LATITUDE, LONGITUDE, BigDecimal.valueOf(10.0), BigDecimal.ZERO, FIXED_INSTANT)
+        testTourist = new User(
+                "risk_audit_user_" + UUID.randomUUID().toString().substring(0, 8),
+                "risk_audit_" + UUID.randomUUID().toString().substring(0, 8) + "@example.com",
+                "hash",
+                "Risk Audit Tourist",
+                "+919876543200",
+                getOrCreateTouristRole()
         );
+        testTourist = userRepository.saveAndFlush(testTourist);
+    }
 
-        // Incident and emergency service mocks
-        lenient().when(incidentService.getActiveIncidents()).thenReturn(List.of());
-        lenient().when(emergencyServicesService.findNearestFacility(anyDouble(), anyDouble())).thenReturn(Optional.empty());
+    @AfterEach
+    void tearDown() {
+        for (UUID decisionId : createdDecisionIds) {
+            riskScoreRepository.findByDecisionId(decisionId).ifPresent(riskScoreRepository::delete);
+        }
+        createdDecisionIds.clear();
 
-        // Historical data mock for Karnataka
-        lenient().when(historicalDataService.getHistoricalSafetyRecords(GeographicLevel.STATE_UT)).thenReturn(List.of(
-                new HistoricalSafetyRecordSummary(
+        if (testTourist != null && testTourist.getId() != null) {
+            userRepository.delete(testTourist);
+            testTourist = null;
+        }
+    }
+
+    @Test
+    @DisplayName("Real MySQL: factor_details JSON column stores all 6 provenance fields and round-trips correctly")
+    void realMysql_persistsProvenanceJsonInFactorDetailsColumn_andRoundTripsAllFields() throws Exception {
+        Instant weatherObservedAt = Instant.parse("2026-08-24T10:15:30Z");
+        Instant incidentReportedAt = Instant.parse("2026-08-24T10:28:00Z");
+
+        List<RiskFactorDetail> factorDetails = List.of(
+                new RiskFactorDetail(
+                        RiskFactorType.HISTORICAL_INCIDENT,
+                        new BigDecimal("0.30"),
+                        true,
+                        "77.2 per lakh",
+                        new BigDecimal("50.0"),
+                        new BigDecimal("15.0"),
+                        null,
+                        "Historical incident data contributed 15.00 risk points.",
                         "MoRTH Road Accidents in India 2024",
-                        2024,
-                        GeographicLevel.STATE_UT,
-                        "Kerala",
-                        "State / UT - wise Total Number of Persons Injured in Road Accidents",
-                        "Total Number of Persons Injured in Road Accidents Per Lakh Population - 2024",
-                        new BigDecimal("152.6"),
-                        false
+                        "HISTORICAL",
+                        "MoRTH-2024-STATE-UT",
+                        null,
+                        null,
+                        "STATE_UT: Karnataka",
+                        "MoRTH 2024 min-max normalized across State/UT benchmarks"
                 ),
-                new HistoricalSafetyRecordSummary(
-                        "MoRTH Road Accidents in India 2024",
-                        2024,
-                        GeographicLevel.STATE_UT,
-                        "Karnataka",
-                        "State / UT - wise Total Number of Persons Injured in Road Accidents",
-                        "Total Number of Persons Injured in Road Accidents Per Lakh Population - 2024",
-                        new BigDecimal("77.2"),
-                        false
+                new RiskFactorDetail(
+                        RiskFactorType.WEATHER,
+                        new BigDecimal("0.20"),
+                        true,
+                        "WMO 61 (Rainy)",
+                        new BigDecimal("79.06699039"),
+                        new BigDecimal("15.81339808"),
+                        null,
+                        "Weather data contributed 15.81 risk points.",
+                        "Open-Meteo current weather observation; risk mapping from MoRTH Road Accidents in India 2024, Table 3.8",
+                        "EXTERNAL_API",
+                        "Open-Meteo-WMO-61",
+                        weatherObservedAt,
+                        900L,
+                        "LOCATION_GRID_0.01DEG[12.97,77.59]",
+                        "MoRTH Table 3.8 condition severity: 44.51 persons killed per 100 accidents"
+                ),
+                new RiskFactorDetail(
+                        RiskFactorType.TIME_OF_DAY,
+                        new BigDecimal("0.15"),
+                        true,
+                        "15:00-18:00 (18.2% accident share)",
+                        new BigDecimal("82.61659718"),
+                        new BigDecimal("12.39248958"),
+                        null,
+                        "Time-of-day data contributed 12.39 risk points.",
+                        "MoRTH Road Accidents in India 2024, Table 7.3 (national 3-hour accident distribution in Indian local time)",
+                        "TEMPORAL_RULE",
+                        "MoRTH-2024-Table-7.3-15:00-18:00",
+                        null,
+                        null,
+                        "NATIONAL",
+                        "MoRTH Table 7.3 interval accident count / peak interval accident count × 100"
+                ),
+                new RiskFactorDetail(
+                        RiskFactorType.SERVICE_PROXIMITY,
+                        new BigDecimal("0.15"),
+                        true,
+                        "2.00 km to Hospital",
+                        new BigDecimal("20.0"),
+                        new BigDecimal("3.0"),
+                        null,
+                        "Emergency-service proximity data contributed 3.00 risk points.",
+                        "OpenStreetMap Emergency Amenities (ODbL)",
+                        "FACILITY_REGISTRY",
+                        "ESC-42",
+                        null,
+                        null,
+                        "RADIUS_10KM_AROUND_LOCATION_GRID[12.97,77.59]",
+                        "Nearest emergency service facility distance / 10.0 km × 100.0, clamped to [0, 100]"
+                ),
+                new RiskFactorDetail(
+                        RiskFactorType.USER_REPORT,
+                        new BigDecimal("0.10"),
+                        true,
+                        "1 active incident(s), raw score 25.00",
+                        new BigDecimal("25.0"),
+                        new BigDecimal("2.5"),
+                        null,
+                        "User-report data contributed 2.50 risk points.",
+                        "GeoShield Incident Reports",
+                        "USER_INCIDENTS",
+                        "QUERY(radius=10.0km,window=24.0h,status=[REPORTED,ACKNOWLEDGED,RESPONDING],matched=1,ids=[00000000-0000-0000-0000-000000000001])",
+                        incidentReportedAt,
+                        150L,
+                        "RADIUS_10KM_AROUND_LOCATION_GRID[12.97,77.59]",
+                        "Sum of distance- and recency-decayed active incident severities within 10 km and 24h, clamped to [0, 100]"
+                ),
+                new RiskFactorDetail(
+                        RiskFactorType.CONNECTIVITY,
+                        new BigDecimal("0.05"),
+                        false,
+                        null,
+                        null,
+                        BigDecimal.ZERO,
+                        "CONNECTIVITY_DORMANT",
+                        "Connectivity data is currently unavailable.",
+                        "Client connectivity",
+                        "DORMANT",
+                        "CONNECTIVITY_NETWORK_METRICS",
+                        null,
+                        null,
+                        "DEVICE_LOCAL",
+                        "No client connectivity input contract is configured."
                 )
-        ));
-
-        // Real feature services with fixed weather observation
-        FixedWeatherObservationProvider weatherProvider = new FixedWeatherObservationProvider(
-                WeatherObservationResult.observed(new WeatherObservation("Open-Meteo", 61, FIXED_INSTANT))
         );
 
-        RiskContextAssembler realAssembler = new RiskContextAssembler(
-                locationService,
-                incidentService,
-                new BoundaryGeographicResolutionService(boundaryIndex),
-                new HistoricalRiskFeatureService(historicalDataService),
-                new IncidentRiskFeatureService(Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC)),
-                new TimeOfDayRiskService(Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC), new MorthTimeOfDayDistribution()),
-                new WeatherRiskService(weatherProvider, new MorthWeatherSeverityTable()),
-                new EmergencyServiceProximityRiskService(emergencyServicesService)
+        String factorDetailsJson = objectMapper.writeValueAsString(factorDetails);
+        String contributingFactorsJson = "[{\"factor\":\"HISTORICAL_INCIDENT\",\"available\":true}]";
+        String completenessJson = "{\"availableFactorCount\":5,\"totalConfiguredFactorCount\":7,\"completenessRatio\":0.7143}";
+
+        UUID decisionId = UUID.randomUUID();
+        createdDecisionIds.add(decisionId);
+
+        RiskScore score = new RiskScore(
+                decisionId,
+                testTourist,
+                49,
+                new BigDecimal("48.71"),
+                RiskLevel.MEDIUM,
+                RiskLevel.MEDIUM,
+                false,
+                null,
+                GeographicLevel.STATE_UT,
+                "Karnataka",
+                "29",
+                completenessJson,
+                factorDetailsJson,
+                contributingFactorsJson,
+                RiskScoringMethod.BASELINE_WEIGHTED,
+                null
         );
 
-        // Real fusion properties (frozen Step 1 / Step 2 weights)
-        RiskFusionProperties fusionProperties = new RiskFusionProperties(
-                new BigDecimal("0.30"),
-                new BigDecimal("0.20"),
-                new BigDecimal("0.15"),
-                new BigDecimal("0.15"),
-                new BigDecimal("0.10"),
-                new BigDecimal("0.05"),
-                new BigDecimal("0.05"),
-                39, 59, 79
+        // Save and flush directly to real MySQL
+        RiskScore saved = riskScoreRepository.saveAndFlush(score);
+        assertNotNull(saved.getId(), "MySQL must generate an auto-increment primary key ID");
+
+        // Retrieve directly from real MySQL
+        RiskScore retrieved = riskScoreRepository.findByDecisionId(decisionId).orElseThrow(
+                () -> new AssertionError("Must find persisted RiskScore in MySQL by decisionId")
         );
 
-        // Real BaselineRiskFusionService (NOT MOCKED)
-        realRiskFusionService = new BaselineRiskFusionService(
-                fusionProperties,
-                identityService,
-                riskScoreRepository,
-                objectMapper
-        );
+        assertEquals(decisionId, retrieved.getDecisionId());
+        assertEquals(49, retrieved.getScore());
+        assertEquals(new BigDecimal("48.71"), retrieved.getDecimalScore());
+        assertEquals(RiskLevel.MEDIUM, retrieved.getEffectiveRiskLevel());
+        assertFalse(retrieved.isOverrideActive());
+        assertEquals("Karnataka", retrieved.getGeographicUnit());
+        assertEquals("29", retrieved.getStateCode());
 
-        // Real RiskApiServiceImpl (NOT MOCKED)
-        realRiskApiService = new RiskApiServiceImpl(
-                realAssembler,
-                realRiskFusionService,
-                locationService,
-                sachetAlertService,
-                riskScoreRepository,
-                identityService,
-                objectMapper
-        );
+        // Validate raw factor_details column content
+        String dbJson = retrieved.getFactorDetails();
+        assertNotNull(dbJson);
+        assertThat(dbJson).contains("EXTERNAL_API");
+        assertThat(dbJson).contains("Open-Meteo-WMO-61");
+        assertThat(dbJson).contains("LOCATION_GRID_0.01DEG[12.97,77.59]");
+        assertThat(dbJson).contains("MoRTH-2024-STATE-UT");
+        assertThat(dbJson).contains("MoRTH-2024-Table-7.3-15:00-18:00");
+        assertThat(dbJson).contains("CONNECTIVITY_DORMANT");
+
+        // Deserialize from real MySQL and verify all 6 provenance fields round-trip cleanly
+        List<RiskFactorDetail> roundTripped = objectMapper.readValue(dbJson, new TypeReference<List<RiskFactorDetail>>() {});
+        assertEquals(6, roundTripped.size());
+
+        // 1. Weather: live observation timestamp, positive age, grid cell
+        RiskFactorDetail weather = roundTripped.stream()
+                .filter(d -> d.factor() == RiskFactorType.WEATHER).findFirst().orElseThrow();
+        assertEquals("EXTERNAL_API", weather.sourceType());
+        assertEquals("Open-Meteo-WMO-61", weather.sourceIdentifier());
+        assertEquals(weatherObservedAt, weather.observedAt());
+        assertEquals(900L, weather.freshnessSeconds());
+        assertEquals("LOCATION_GRID_0.01DEG[12.97,77.59]", weather.geographicScope());
+        assertNotNull(weather.normalizationDetails());
+
+        // 2. Historical: null observedAt, null freshness, state scope
+        RiskFactorDetail hist = roundTripped.stream()
+                .filter(d -> d.factor() == RiskFactorType.HISTORICAL_INCIDENT).findFirst().orElseThrow();
+        assertEquals("HISTORICAL", hist.sourceType());
+        assertEquals("MoRTH-2024-STATE-UT", hist.sourceIdentifier());
+        assertNull(hist.observedAt());
+        assertNull(hist.freshnessSeconds());
+        assertEquals("STATE_UT: Karnataka", hist.geographicScope());
+
+        // 3. Time of Day: null observedAt, null freshness, national scope
+        RiskFactorDetail tod = roundTripped.stream()
+                .filter(d -> d.factor() == RiskFactorType.TIME_OF_DAY).findFirst().orElseThrow();
+        assertEquals("TEMPORAL_RULE", tod.sourceType());
+        assertEquals("MoRTH-2024-Table-7.3-15:00-18:00", tod.sourceIdentifier());
+        assertNull(tod.observedAt());
+        assertNull(tod.freshnessSeconds());
+        assertEquals("NATIONAL", tod.geographicScope());
+
+        // 4. Incident: live observation, positive age, radius scope
+        RiskFactorDetail incident = roundTripped.stream()
+                .filter(d -> d.factor() == RiskFactorType.USER_REPORT).findFirst().orElseThrow();
+        assertEquals("USER_INCIDENTS", incident.sourceType());
+        assertEquals(incidentReportedAt, incident.observedAt());
+        assertEquals(150L, incident.freshnessSeconds());
+        assertEquals("RADIUS_10KM_AROUND_LOCATION_GRID[12.97,77.59]", incident.geographicScope());
+
+        // 5. Dormant: unavailable factor, dormant reason code, dormant provenance
+        RiskFactorDetail conn = roundTripped.stream()
+                .filter(d -> d.factor() == RiskFactorType.CONNECTIVITY).findFirst().orElseThrow();
+        assertFalse(conn.available());
+        assertEquals("CONNECTIVITY_DORMANT", conn.reason());
+        assertEquals("DORMANT", conn.sourceType());
+        assertEquals("CONNECTIVITY_NETWORK_METRICS", conn.sourceIdentifier());
+        assertEquals("DEVICE_LOCAL", conn.geographicScope());
     }
 
     @Test
-    @DisplayName("End-to-end: computes baseline risk and updates audit persistence with SACHET CRITICAL override")
-    void computesBaselineAndPersistsSachetCriticalOverride() {
-        SachetAlertSummary severeAlert = new SachetAlertSummary(
-                UUID.randomUUID(),
+    @DisplayName("Real MySQL: legacy factor_details without Step 4 provenance remain fully readable without regression")
+    void realMysql_persistsLegacyFactorDetails_andRemainsReadableWithoutRegression() throws Exception {
+        // Legacy JSON generated prior to Step 4 provenance fields
+        String legacyJson = """
+                [
+                  {
+                    "factor": "HISTORICAL_INCIDENT",
+                    "weight": 0.30,
+                    "available": true,
+                    "rawValue": "77.2 per lakh",
+                    "normalizedValue": 50.0,
+                    "weightedContribution": 15.0,
+                    "reason": null,
+                    "summary": "Historical incident data contributed 15.00 risk points.",
+                    "source": "MoRTH Road Accidents in India 2024"
+                  }
+                ]
+                """;
+
+        UUID decisionId = UUID.randomUUID();
+        createdDecisionIds.add(decisionId);
+
+        RiskScore legacyScore = new RiskScore(
+                decisionId,
+                testTourist,
+                15,
+                new BigDecimal("15.00"),
+                RiskLevel.LOW,
+                RiskLevel.LOW,
+                false,
+                null,
+                GeographicLevel.STATE_UT,
+                "Karnataka",
+                "29",
+                null,
+                legacyJson,
+                "[{\"factor\":\"HISTORICAL_INCIDENT\",\"available\":true}]",
+                RiskScoringMethod.BASELINE_WEIGHTED,
+                null
+        );
+
+        riskScoreRepository.saveAndFlush(legacyScore);
+
+        RiskScore retrieved = riskScoreRepository.findByDecisionId(decisionId).orElseThrow();
+        assertNotNull(retrieved.getFactorDetails());
+
+        // Deserialize legacy JSON into updated model: new fields must default cleanly to null
+        List<RiskFactorDetail> deserialized = objectMapper.readValue(
+                retrieved.getFactorDetails(),
+                new TypeReference<List<RiskFactorDetail>>() {}
+        );
+
+        assertEquals(1, deserialized.size());
+        RiskFactorDetail detail = deserialized.get(0);
+        assertEquals(RiskFactorType.HISTORICAL_INCIDENT, detail.factor());
+        assertThat(detail.weight()).isEqualByComparingTo("0.30");
+        assertThat(detail.normalizedValue()).isEqualByComparingTo("50.0");
+        assertEquals("MoRTH Road Accidents in India 2024", detail.source());
+
+        // The 6 new provenance fields gracefully deserialize as null from legacy records
+        assertNull(detail.sourceType());
+        assertNull(detail.sourceIdentifier());
+        assertNull(detail.observedAt());
+        assertNull(detail.freshnessSeconds());
+        assertNull(detail.geographicScope());
+        assertNull(detail.normalizationDetails());
+    }
+
+    @Test
+    @DisplayName("Real MySQL: persists SACHET CRITICAL override audit columns alongside factor details")
+    void realMysql_persistsSachetCriticalOverrideAuditDecision() throws Exception {
+        UUID decisionId = UUID.randomUUID();
+        createdDecisionIds.add(decisionId);
+
+        String factorDetailsJson = "[]";
+        RiskScore overrideScore = new RiskScore(
+                decisionId,
+                testTourist,
+                30,
+                new BigDecimal("30.00"),
+                RiskLevel.LOW,
+                RiskLevel.CRITICAL,
+                true,
                 "NDMA-2026-CYC-0042",
-                "alert@sachet.ndma.gov.in",
-                FIXED_INSTANT,
-                "Met",
-                "Severe Cyclonic Storm Warning",
-                "Immediate",
-                "Extreme",
-                "Observed",
-                FIXED_INSTANT.minus(1, ChronoUnit.HOURS),
-                FIXED_INSTANT.plus(5, ChronoUnit.HOURS),
-                "Severe Cyclone Warning",
-                "Evacuate coastal and low-lying areas",
-                "Seek immediate emergency shelter",
-                "Karnataka Coastal",
-                false
+                GeographicLevel.STATE_UT,
+                "Karnataka",
+                "29",
+                "{}",
+                factorDetailsJson,
+                "[]",
+                RiskScoringMethod.BASELINE_WEIGHTED,
+                null
         );
 
-        when(sachetAlertService.findApplicableActiveAlert(eq(LATITUDE.doubleValue()), eq(LONGITUDE.doubleValue()), any(Instant.class)))
-                .thenReturn(Optional.of(severeAlert));
-        when(sachetAlertService.isQualifyingSevereAlert(severeAlert)).thenReturn(true);
+        riskScoreRepository.saveAndFlush(overrideScore);
 
-        RiskResponse response = realRiskApiService.getCurrentRisk(userId);
-
-        // 1. Verify API response
-        assertNotNull(response);
-        assertNotNull(response.decisionId());
-        assertTrue(response.overrideActive());
-        assertEquals(RiskLevel.CRITICAL, response.effectiveRiskLevel());
-        // Baseline level preserved in response.riskLevel()
-        assertNotNull(response.riskLevel());
-        assertFalse(response.riskLevel() == RiskLevel.CRITICAL); // Baseline score is not critical
-
-        // 2. Verify repository persistence: storedScore must exist and be updated
-        RiskScore persisted = storedScores.get(response.decisionId());
-        assertNotNull(persisted, "RiskScore must be saved in repository under the generated decisionId");
-        assertEquals(response.decisionId(), persisted.getDecisionId());
-        assertTrue(persisted.isOverrideActive());
-        assertEquals(RiskLevel.CRITICAL, persisted.getEffectiveRiskLevel());
-        assertEquals(response.riskLevel(), persisted.getRiskLevel()); // Baseline preserved
-        assertEquals("NDMA-2026-CYC-0042", persisted.getSachetAlertIdentifier());
-        assertEquals(GeographicLevel.STATE_UT, persisted.getGeographicLevel());
-        assertEquals("Karnataka", persisted.getGeographicUnit());
-        assertEquals("29", persisted.getStateCode());
-
-        // 3. Verify audit json columns
-        assertNotNull(persisted.getContributingFactors());
-        assertThat(persisted.getContributingFactors()).contains("HISTORICAL_INCIDENT");
-        assertNotNull(persisted.getDataCompleteness());
-        assertThat(persisted.getDataCompleteness()).contains("availableFactorCount");
-        assertNotNull(persisted.getFactorDetails());
-        assertThat(persisted.getFactorDetails()).contains("HISTORICAL_INCIDENT");
-    }
-
-    @Test
-    @DisplayName("End-to-end: computes standard baseline and persists truthfully when no severe alert active")
-    void computesBaselineAndPersistsStandardDecisionWithoutOverride() {
-        when(sachetAlertService.findApplicableActiveAlert(eq(LATITUDE.doubleValue()), eq(LONGITUDE.doubleValue()), any(Instant.class)))
-                .thenReturn(Optional.empty());
-
-        RiskResponse response = realRiskApiService.getCurrentRisk(userId);
-
-        assertNotNull(response);
-        assertNotNull(response.decisionId());
-        assertFalse(response.overrideActive());
-        assertEquals(response.riskLevel(), response.effectiveRiskLevel());
-
-        RiskScore persisted = storedScores.get(response.decisionId());
-        assertNotNull(persisted);
-        assertEquals(response.decisionId(), persisted.getDecisionId());
-        assertFalse(persisted.isOverrideActive());
-        assertEquals(response.riskLevel(), persisted.getEffectiveRiskLevel());
-        assertEquals("Karnataka", persisted.getGeographicUnit());
-        assertEquals("29", persisted.getStateCode());
-    }
-
-    private record FixedWeatherObservationProvider(WeatherObservationResult result)
-            implements WeatherObservationProvider {
-
-        @Override
-        public WeatherObservationResult currentWeather(BigDecimal latitude, BigDecimal longitude) {
-            return result;
-        }
-
-        @Override
-        public String providerName() {
-            return "Open-Meteo";
-        }
+        RiskScore retrieved = riskScoreRepository.findByDecisionId(decisionId).orElseThrow();
+        assertTrue(retrieved.isOverrideActive());
+        assertEquals(RiskLevel.CRITICAL, retrieved.getEffectiveRiskLevel());
+        assertEquals(RiskLevel.LOW, retrieved.getRiskLevel(), "Baseline level must be preserved");
+        assertEquals("NDMA-2026-CYC-0042", retrieved.getSachetAlertIdentifier());
+        assertEquals("Karnataka", retrieved.getGeographicUnit());
+        assertEquals("29", retrieved.getStateCode());
     }
 }

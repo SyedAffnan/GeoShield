@@ -50,7 +50,7 @@ class RiskDataCompletenessTest {
     @BeforeEach
     void setUp() {
         userId = UUID.randomUUID();
-        objectMapper = new ObjectMapper();
+        objectMapper = new ObjectMapper().findAndRegisterModules();
         service = new BaselineRiskFusionService(properties(), identityService, riskScoreRepository, objectMapper);
         lenient().when(identityService.getUserById(userId)).thenReturn(user);
     }

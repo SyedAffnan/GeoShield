@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * Maps the current time to its MoRTH 3-hour interval and normalizes that interval's published
- * national accident count into the time-of-day risk feature.
+ * national accident count into the time-of-day risk feature with full provenance.
  *
  * <p>The distribution is a national aggregate for India. It is not State/UT-specific and not
  * tourist-specific, matching Architecture v3.2 Section 29's {@code timeIntervalRiskShare}
@@ -29,6 +29,9 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class TimeOfDayRiskService {
+    public static final String SOURCE_TYPE = "TEMPORAL_RULE";
+    public static final String GEOGRAPHIC_SCOPE = "NATIONAL";
+
     private final Clock clock;
     private final MorthTimeOfDayDistribution distribution;
 
@@ -56,9 +59,6 @@ public class TimeOfDayRiskService {
 
     /**
      * The normalized time-of-day risk for the current instant.
-     *
-     * <p>Available only when the verified MoRTH distribution loaded and the current hour maps to
-     * a published interval. No value is ever synthesized for a missing interval.
      */
     public NormalizedRiskFeature currentRisk() {
         return riskAt(clock.instant());
@@ -67,21 +67,60 @@ public class TimeOfDayRiskService {
     NormalizedRiskFeature riskAt(Instant instant) {
         TimeOfDayBand band = bandAt(instant);
         if (!distribution.isLoaded()) {
-            return NormalizedRiskFeature.unavailable(RiskFactorType.TIME_OF_DAY,
-                    MorthTimeOfDayDistribution.SOURCE, distribution.unavailabilityReason(),
+            String reason = distribution.unavailabilityReason();
+            String reasonCode = NormalizedRiskFeature.defaultReasonCode(RiskFactorType.TIME_OF_DAY, reason);
+            return NormalizedRiskFeature.unavailable(
+                    RiskFactorType.TIME_OF_DAY,
+                    MorthTimeOfDayDistribution.SOURCE,
+                    reason,
+                    "Requires the verified MoRTH 3-hour interval distribution; no score is synthesized.",
+                    reasonCode,
+                    null,
+                    SOURCE_TYPE,
+                    null,
+                    null,
+                    null,
+                    GEOGRAPHIC_SCOPE,
                     "Requires the verified MoRTH 3-hour interval distribution; no score is synthesized.");
         }
         Optional<TimeOfDayInterval> interval = distribution.intervalAtHour(sourceHourOf(instant));
         if (interval.isEmpty()) {
-            return NormalizedRiskFeature.unavailable(RiskFactorType.TIME_OF_DAY,
+            String reason = "MoRTH Table 7.3 publishes no time interval covering the " + band.startHour() + "–"
+                    + band.endHour() + " hour band in Indian local time.";
+            String reasonCode = NormalizedRiskFeature.defaultReasonCode(RiskFactorType.TIME_OF_DAY, reason);
+            return NormalizedRiskFeature.unavailable(
+                    RiskFactorType.TIME_OF_DAY,
                     MorthTimeOfDayDistribution.SOURCE,
-                    "MoRTH Table 7.3 publishes no time interval covering the " + band.startHour() + "–"
-                            + band.endHour() + " hour band in Indian local time.",
+                    reason,
+                    "Requires a published MoRTH interval for the current hour; no score is synthesized.",
+                    reasonCode,
+                    null,
+                    SOURCE_TYPE,
+                    null,
+                    null,
+                    null,
+                    GEOGRAPHIC_SCOPE,
                     "Requires a published MoRTH interval for the current hour; no score is synthesized.");
         }
         TimeOfDayInterval published = interval.get();
-        return new NormalizedRiskFeature(RiskFactorType.TIME_OF_DAY, published.normalizedRisk(), true,
-                MorthTimeOfDayDistribution.SOURCE, explain(published), MorthTimeOfDayDistribution.NORMALIZATION);
+        String rawValue = published.label() + " (" + published.publishedSharePercent().stripTrailingZeros().toPlainString() + "% accident share)";
+        String sourceId = "MoRTH-2024-Table-7.3-" + published.label();
+
+        return new NormalizedRiskFeature(
+                RiskFactorType.TIME_OF_DAY,
+                published.normalizedRisk(),
+                true,
+                MorthTimeOfDayDistribution.SOURCE,
+                explain(published),
+                MorthTimeOfDayDistribution.NORMALIZATION,
+                null,
+                rawValue,
+                SOURCE_TYPE,
+                sourceId,
+                null,
+                null,
+                GEOGRAPHIC_SCOPE,
+                MorthTimeOfDayDistribution.NORMALIZATION);
     }
 
     /** Names the interval, its published values, and its national, non-tourist-specific scope. */

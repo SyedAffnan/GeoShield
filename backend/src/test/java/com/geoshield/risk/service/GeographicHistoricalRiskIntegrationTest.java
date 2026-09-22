@@ -176,7 +176,7 @@ class GeographicHistoricalRiskIntegrationTest {
         storedLocationIs(LATITUDE, LONGITUDE);
         morthPerLakhRecordsAreAvailable();
         var fusion = new BaselineRiskFusionService(approvedProperties(), identityService,
-                riskScoreRepository, new ObjectMapper());
+                riskScoreRepository, new ObjectMapper().findAndRegisterModules());
 
         BaselineRiskResult result = fusion.calculateBaselineRisk(assembler.assembleForCurrentUser(userId));
 
@@ -242,7 +242,7 @@ class GeographicHistoricalRiskIntegrationTest {
         when(incidentService.getActiveIncidents()).thenReturn(List.of(activeIncident));
 
         var fusion = new BaselineRiskFusionService(approvedProperties(), identityService,
-                riskScoreRepository, new ObjectMapper());
+                riskScoreRepository, new ObjectMapper().findAndRegisterModules());
 
         BaselineRiskResult result = fusion.calculateBaselineRisk(assembler.assembleForCurrentUser(userId));
 
@@ -273,7 +273,7 @@ class GeographicHistoricalRiskIntegrationTest {
                 .thenReturn(java.util.Optional.of(new com.geoshield.emergencyservices.dto.NearestFacilityResult(centerResp, 5.0)));
 
         var fusion = new BaselineRiskFusionService(approvedProperties(), identityService,
-                riskScoreRepository, new ObjectMapper());
+                riskScoreRepository, new ObjectMapper().findAndRegisterModules());
 
         BaselineRiskResult result = fusion.calculateBaselineRisk(assembler.assembleForCurrentUser(userId));
 
@@ -355,7 +355,7 @@ class GeographicHistoricalRiskIntegrationTest {
         morthPerLakhRecordsAreAvailable();
         var offline = assemblerObserving(WeatherObservationResult.unavailable("provider offline"));
         var fusion = new BaselineRiskFusionService(approvedProperties(), identityService,
-                riskScoreRepository, new ObjectMapper());
+                riskScoreRepository, new ObjectMapper().findAndRegisterModules());
 
         BaselineRiskResult result = fusion.calculateBaselineRisk(offline.assembleForCurrentUser(userId));
 
