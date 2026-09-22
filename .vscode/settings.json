@@ -1,0 +1,8 @@
+{
+    "java.compile.nullAnalysis.mode": "automatic",
+    "files.watcherExclude": {
+        "**/maven-target/**": true,
+        "**/target/**": true,
+        "**/target-ide/**": true
+    }
+}

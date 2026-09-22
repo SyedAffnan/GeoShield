@@ -34,8 +34,36 @@ public class SosController {
     @PreAuthorize("hasRole('TOURIST')")
     public ResponseEntity<ApiResponse<SosResponse>> createSos(
             Authentication authentication,
+            @org.springframework.web.bind.annotation.RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKeyHeader,
+            @org.springframework.web.bind.annotation.RequestHeader(value = "X-Idempotency-Key", required = false) String xIdempotencyKeyHeader,
             @Valid @RequestBody CreateSosRequest request) {
-        SosResponse response = sosService.createSos(currentUserId(authentication), request);
+        String rawHeader = idempotencyKeyHeader != null && !idempotencyKeyHeader.isBlank()
+                ? idempotencyKeyHeader
+                : xIdempotencyKeyHeader;
+        UUID headerKey = null;
+        if (rawHeader != null && !rawHeader.isBlank()) {
+            try {
+                headerKey = UUID.fromString(rawHeader.trim());
+            } catch (IllegalArgumentException e) {
+                throw new com.geoshield.common.exception.ValidationException("Invalid UUID format for Idempotency-Key header: " + rawHeader);
+            }
+        }
+
+        UUID bodyKey = request.clientRequestId();
+        if (headerKey != null && bodyKey != null && !headerKey.equals(bodyKey)) {
+            throw new com.geoshield.common.exception.ValidationException("Idempotency-Key header (" + headerKey + ") and body clientRequestId (" + bodyKey + ") must match");
+        }
+
+        UUID effectiveKey = headerKey != null ? headerKey : bodyKey;
+        if (effectiveKey == null) {
+            throw new com.geoshield.common.exception.ValidationException("clientRequestId or Idempotency-Key header is required");
+        }
+
+        CreateSosRequest effectiveRequest = request.clientRequestId() != null && request.clientRequestId().equals(effectiveKey)
+                ? request
+                : request.withClientRequestId(effectiveKey);
+
+        SosResponse response = sosService.createSos(currentUserId(authentication), effectiveRequest);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("SOS alert triggered", response));
     }
 

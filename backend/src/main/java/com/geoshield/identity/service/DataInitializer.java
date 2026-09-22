@@ -32,6 +32,7 @@ public class DataInitializer implements ApplicationRunner {
     private final PasswordEncoder passwordEncoder;
     private final boolean devSeedEnabled;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public DataInitializer(UserRepository userRepository,
                            RoleRepository roleRepository,
                            PasswordEncoder passwordEncoder,

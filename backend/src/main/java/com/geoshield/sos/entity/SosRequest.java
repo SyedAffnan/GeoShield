@@ -49,6 +49,18 @@ public class SosRequest extends BaseEntity {
     @Column(name = "client_request_id", nullable = false, unique = true, updatable = false)
     private UUID clientRequestId;
 
+    @Column(name = "acknowledged_at")
+    private java.time.Instant acknowledgedAt;
+
+    @Column(name = "responding_at")
+    private java.time.Instant respondingAt;
+
+    @Column(name = "resolved_at")
+    private java.time.Instant resolvedAt;
+
+    @Column(name = "cancelled_at")
+    private java.time.Instant cancelledAt;
+
     public SosRequest() { }
 
     public SosRequest(User user, BigDecimal latitude, BigDecimal longitude, SosStatus status, UUID clientRequestId) {
@@ -66,7 +78,35 @@ public class SosRequest extends BaseEntity {
     public SosStatus getStatus() { return status; }
     public User getAssignedResponder() { return assignedResponder; }
     public UUID getClientRequestId() { return clientRequestId; }
+    public java.time.Instant getAcknowledgedAt() { return acknowledgedAt; }
+    public java.time.Instant getRespondingAt() { return respondingAt; }
+    public java.time.Instant getResolvedAt() { return resolvedAt; }
+    public java.time.Instant getCancelledAt() { return cancelledAt; }
 
     public void setStatus(SosStatus status) { this.status = status; }
     public void setAssignedResponder(User assignedResponder) { this.assignedResponder = assignedResponder; }
+
+    public void setAcknowledgedAt(java.time.Instant acknowledgedAt) {
+        if (this.acknowledgedAt == null) {
+            this.acknowledgedAt = acknowledgedAt;
+        }
+    }
+
+    public void setRespondingAt(java.time.Instant respondingAt) {
+        if (this.respondingAt == null) {
+            this.respondingAt = respondingAt;
+        }
+    }
+
+    public void setResolvedAt(java.time.Instant resolvedAt) {
+        if (this.resolvedAt == null) {
+            this.resolvedAt = resolvedAt;
+        }
+    }
+
+    public void setCancelledAt(java.time.Instant cancelledAt) {
+        if (this.cancelledAt == null) {
+            this.cancelledAt = cancelledAt;
+        }
+    }
 }

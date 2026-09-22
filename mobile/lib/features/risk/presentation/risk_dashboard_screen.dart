@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/di/providers.dart';
 import '../../../core/geofencing/presentation/geofence_status_card.dart';
@@ -8,6 +9,7 @@ import '../../../core/location/device_location_service.dart';
 import '../../../core/network/auth_exception.dart';
 import '../../../core/network/connectivity_state.dart';
 import '../../../core/network/network_exception.dart';
+import '../../sos/data/sos_outbox_item.dart';
 import '../../sos/data/sos_repository.dart';
 import '../data/risk_repository.dart';
 import 'sachet_disaster_alert_card.dart';
@@ -29,45 +31,88 @@ class _RiskDashboardScreenState extends ConsumerState<RiskDashboardScreen> {
   ///
   /// Rules enforced:
   ///   1. Requires a valid GPS fix — never sends 0,0 or fake coordinates.
-  ///   2. Shows a confirmation dialog before any network request is made.
-  ///   3. Navigates to SosStatusScreen on success so the tourist tracks progress.
-  ///   4. Shows a clear inline error on failure.
+  ///   2. Checks for an existing pending/syncing/cancelPending outbox item and
+  ///      navigates directly to SosStatusScreen instead of creating a duplicate.
+  ///   3. Shows a confirmation dialog before any network request is made.
+  ///   4. Navigates to SosStatusScreen on success so the tourist tracks progress.
+  ///   5. Shows a clear inline error on failure.
+  ///   6. On irrecoverable local write failure (StateError) shows a red
+  ///      "Call 112 immediately" dialog.
   Future<void> _triggerSos() async {
-    // Step 1 — confirmation dialog
-    final confirmed = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        icon: Icon(Icons.sos_rounded,
-            size: 40, color: Theme.of(context).colorScheme.error),
-        title: const Text('Send Emergency SOS?'),
-        content: const Text(
-          'This will send your current GPS location to GeoShield emergency '
-          'responders immediately.\n\n'
-          'Only use this in a genuine emergency.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.error),
-            child: const Text('Send SOS'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-
-    setState(() {
-      _sosSending = true;
-      _sosError = null;
-    });
+    final repo = ref.read(sosRepositoryProvider);
+    final store = repo.outboxStore;
 
     try {
+      // Pre-flight — if an outbox item already exists, navigate to its status
+      // screen without triggering a duplicate SOS.
+      if (store != null) {
+        final router = GoRouter.of(context);
+        await store.ready;
+        final pendingItems = await store.getPending();
+        final cancelPendingItems =
+            pendingItems.isEmpty ? await store.getCancelPending() : <SosOutboxItem>[];
+        final failedItems = (pendingItems.isEmpty && cancelPendingItems.isEmpty)
+            ? await store.getFailed()
+            : <SosOutboxItem>[];
+
+        final activeItem = pendingItems.isNotEmpty
+            ? pendingItems.first
+            : cancelPendingItems.isNotEmpty
+                ? cancelPendingItems.first
+                : failedItems.isNotEmpty
+                    ? failedItems.first
+                    : null;
+
+        if (activeItem != null && mounted) {
+          final existingAlert = SosAlert(
+            sosId: 'local-${activeItem.clientRequestId}',
+            latitude: activeItem.latitude,
+            longitude: activeItem.longitude,
+            status: SosStatusValue.pending,
+            triggeredAt: activeItem.createdAt,
+            clientRequestId: activeItem.clientRequestId,
+            isPendingDelivery: true,
+          );
+          router.push('/sos', extra: existingAlert);
+          return;
+        }
+      }
+
+      // Step 1 — confirmation dialog
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => AlertDialog(
+          icon: Icon(Icons.sos_rounded,
+              size: 40, color: Theme.of(context).colorScheme.error),
+          title: const Text('Send Emergency SOS?'),
+          content: const Text(
+            'This will send your current GPS location to GeoShield emergency '
+            'responders immediately.\n\n'
+            'Only use this in a genuine emergency.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.error),
+              child: const Text('Send SOS'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+
+      setState(() {
+        _sosSending = true;
+        _sosError = null;
+      });
+
       // Step 2 — obtain real GPS fix
       final locationResult =
           await ref.read(deviceLocationServiceProvider).currentPosition();
@@ -89,17 +134,25 @@ class _RiskDashboardScreenState extends ConsumerState<RiskDashboardScreen> {
       }
       final fix = locationResult as DeviceLocationFix;
 
-      // Step 3 — create SOS using the existing backend API
-      final alert = await ref.read(sosRepositoryProvider).createSos(
+      // Step 3 — dispatch or queue SOS using outbox-backed API.
+      // clientRequestId intentionally omitted — the repository reuses any
+      // existing outbox key for idempotency (prevents generating a fresh key
+      // on every duplicate tap after a crash or network failure).
+      final alert = await repo.dispatchOrQueueSos(
             latitude: fix.latitude,
             longitude: fix.longitude,
-            clientRequestId: generateClientRequestId(),
           );
       if (!mounted) return;
 
       setState(() => _sosSending = false);
       // Navigate to the SOS status screen with the alert as GoRouter extra
       if (mounted) context.push('/sos', extra: alert);
+    } on StateError {
+      // Irrecoverable — local SQLite write failed or store not ready; alert was NOT saved.
+      // Instruct the user to call emergency services directly.
+      if (!mounted) return;
+      setState(() => _sosSending = false);
+      await _showCritical112Dialog();
     } on AuthException {
       if (!mounted) return;
       setState(() {
@@ -119,6 +172,52 @@ class _RiskDashboardScreenState extends ConsumerState<RiskDashboardScreen> {
         _sosError = 'SOS failed: ${e.toString()}';
       });
     }
+  }
+
+  Future<void> _showCritical112Dialog() async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        backgroundColor: Theme.of(context).colorScheme.errorContainer,
+        title: Row(
+          children: [
+            Icon(Icons.error_rounded,
+                color: Theme.of(context).colorScheme.onErrorContainer),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'CRITICAL: Alert Not Saved',
+                style: TextStyle(
+                    color: Theme.of(context).colorScheme.onErrorContainer),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Emergency alert could not be recorded locally. '
+          'Call 112 immediately.',
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onErrorContainer,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        actions: [
+          TextButton.icon(
+            onPressed: () {
+              launchUrl(Uri.parse('tel:112'));
+              Navigator.of(context).pop();
+            },
+            icon: const Icon(Icons.phone_rounded),
+            label: const Text('Call 112'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Dismiss'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

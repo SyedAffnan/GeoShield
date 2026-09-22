@@ -16,5 +16,25 @@ public record SosResponse(
         SosStatus status,
         UUID assignedResponderId,
         UUID clientRequestId,
-        Instant triggeredAt
-) { }
+        Instant triggeredAt,
+        Instant acknowledgedAt,
+        Instant respondingAt,
+        Instant resolvedAt,
+        Instant cancelledAt
+) {
+    public SosResponse(
+            UUID sosId,
+            UUID userId,
+            String username,
+            String fullName,
+            String phoneNumber,
+            BigDecimal latitude,
+            BigDecimal longitude,
+            SosStatus status,
+            UUID assignedResponderId,
+            UUID clientRequestId,
+            Instant triggeredAt
+    ) {
+        this(sosId, userId, username, fullName, phoneNumber, latitude, longitude, status, assignedResponderId, clientRequestId, triggeredAt, null, null, null, null);
+    }
+}

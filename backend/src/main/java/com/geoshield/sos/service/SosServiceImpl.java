@@ -29,33 +29,31 @@ public class SosServiceImpl implements SosService {
     private final SosRequestRepository sosRequestRepository;
     private final IdentityService identityService;
     private final SosMapper sosMapper;
+    private final SosTransactionHelper sosTransactionHelper;
 
-    public SosServiceImpl(SosRequestRepository sosRequestRepository, IdentityService identityService, SosMapper sosMapper) {
+    public SosServiceImpl(
+            SosRequestRepository sosRequestRepository,
+            IdentityService identityService,
+            SosMapper sosMapper,
+            SosTransactionHelper sosTransactionHelper
+    ) {
         this.sosRequestRepository = sosRequestRepository;
         this.identityService = identityService;
         this.sosMapper = sosMapper;
+        this.sosTransactionHelper = sosTransactionHelper;
     }
 
     @Override
-    @Transactional
     public SosResponse createSos(UUID touristId, CreateSosRequest request) {
-        var existing = sosRequestRepository.findByUserIdAndClientRequestId(touristId, request.clientRequestId());
-        if (existing.isPresent()) {
-            return sosMapper.toResponse(existing.get());
+        try {
+            return sosTransactionHelper.createSosInTransaction(touristId, request);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            try {
+                return sosTransactionHelper.resolveExistingSosAfterConflict(request.clientRequestId(), touristId);
+            } catch (ResourceNotFoundException notFound) {
+                throw e;
+            }
         }
-        if (sosRequestRepository.findByClientRequestId(request.clientRequestId()).isPresent()) {
-            throw new ConflictException("clientRequestId is already associated with another user");
-        }
-
-        User tourist = identityService.getUserById(touristId);
-        SosRequest sosRequest = new SosRequest(
-                tourist,
-                request.latitude(),
-                request.longitude(),
-                SosStatus.PENDING,
-                request.clientRequestId()
-        );
-        return sosMapper.toResponse(sosRequestRepository.save(sosRequest));
     }
 
     @Override
@@ -80,6 +78,7 @@ public class SosServiceImpl implements SosService {
         }
 
         sosRequest.setStatus(SosStatus.CANCELLED);
+        sosRequest.setCancelledAt(java.time.Instant.now());
         return sosMapper.toResponse(sosRequestRepository.save(sosRequest));
     }
 
@@ -108,6 +107,17 @@ public class SosServiceImpl implements SosService {
 
         validateSosStateTransition(sosRequest.getStatus(), newStatus);
         sosRequest.setStatus(newStatus);
+        java.time.Instant now = java.time.Instant.now();
+        if (newStatus == SosStatus.ACKNOWLEDGED) {
+            sosRequest.setAcknowledgedAt(now);
+        } else if (newStatus == SosStatus.RESPONDING) {
+            sosRequest.setRespondingAt(now);
+        } else if (newStatus == SosStatus.RESOLVED) {
+            sosRequest.setResolvedAt(now);
+        } else if (newStatus == SosStatus.CANCELLED) {
+            sosRequest.setCancelledAt(now);
+        }
+
         if (responderId != null) {
             User responder = identityService.getUserById(responderId);
             sosRequest.setAssignedResponder(responder);

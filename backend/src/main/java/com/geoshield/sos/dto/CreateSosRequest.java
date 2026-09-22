@@ -17,6 +17,9 @@ public record CreateSosRequest(
         @DecimalMax(value = "180.0", message = "Longitude must be between -180 and 180")
         BigDecimal longitude,
 
-        @NotNull(message = "clientRequestId is required")
         UUID clientRequestId
-) { }
+) {
+    public CreateSosRequest withClientRequestId(UUID clientRequestId) {
+        return new CreateSosRequest(this.latitude, this.longitude, clientRequestId);
+    }
+}

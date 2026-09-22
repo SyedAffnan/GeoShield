@@ -4,6 +4,7 @@ import '../storage/secure_session_storage.dart';
 import 'auth_exception.dart';
 import 'conflict_exception.dart';
 import 'network_exception.dart';
+import 'resource_not_found_exception.dart';
 import 'validation_exception.dart';
 
 abstract class ApiClient {
@@ -101,9 +102,14 @@ class GeoShieldApiClient implements ApiClient {
   Future<Map<String, dynamic>> postData(
     String path, {
     required Map<String, dynamic> data,
+    Map<String, dynamic>? headers,
   }) async {
     try {
-      final response = await dio.post<dynamic>(path, data: data);
+      final response = await dio.post<dynamic>(
+        path,
+        data: data,
+        options: headers != null ? Options(headers: headers) : null,
+      );
       return _mapData(response.data);
     } on DioException catch (error) {
       throw _toException(error);
@@ -163,6 +169,10 @@ class GeoShieldApiClient implements ApiClient {
     if (statusCode == 400) {
       return ValidationException(
           _serverMessage(error) ?? 'The server rejected the submitted values.');
+    }
+    if (statusCode == 404) {
+      return ResourceNotFoundException(
+          _serverMessage(error) ?? 'Resource not found.');
     }
     return const NetworkException('Unable to reach the GeoShield service.');
   }

@@ -9,6 +9,7 @@ import '../../features/incidents/data/incident_repository.dart';
 import '../../features/location/data/location_repository.dart';
 import '../../features/responder/data/responder_repository.dart';
 import '../../features/risk/data/risk_repository.dart';
+import '../../features/sos/data/sos_outbox_store.dart';
 import '../../features/sos/data/sos_repository.dart';
 import '../geofencing/presentation/geofence_controller.dart';
 import '../geofencing/services/geofence_notification_service.dart';
@@ -224,6 +225,22 @@ final responderRepositoryProvider = Provider<ResponderRepository>((ref) {
   return ResponderRepository(ref.watch(apiClientProvider));
 });
 
+final sosOutboxStoreProvider = Provider<SosOutboxStore>((ref) {
+  final store = SqfliteSosOutboxStore();
+  unawaited(store.init());
+  return store;
+});
+
 final sosRepositoryProvider = Provider<SosRepository>((ref) {
-  return SosRepository(ref.watch(apiClientProvider));
+  final store = ref.watch(sosOutboxStoreProvider);
+  final repo = SosRepository(
+    ref.watch(apiClientProvider),
+    outboxStore: store,
+  );
+  ref.listen<AsyncValue<ConnectivityState>>(connectivityStateProvider, (prev, next) {
+    if (next.asData?.value.backendReachable == true) {
+      unawaited(repo.drainOutbox());
+    }
+  });
+  return repo;
 });

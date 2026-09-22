@@ -47,7 +47,7 @@ class SosControllerTest {
     }
 
     @Test
-    void createSos_returnsCreatedWithPendingStatus() {
+    void createSos_withBodyOnly_returnsCreatedWithPendingStatus() {
         UUID clientRequestId = UUID.randomUUID();
         CreateSosRequest request = new CreateSosRequest(
                 new BigDecimal("12.9716"),
@@ -62,12 +62,122 @@ class SosControllerTest {
         when(sosService.createSos(eq(touristId), any(CreateSosRequest.class)))
                 .thenReturn(expectedResponse);
 
-        var result = sosController.createSos(authentication, request);
+        var result = sosController.createSos(authentication, null, null, request);
 
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(result.getBody()).isNotNull();
         assertThat(result.getBody().data().status()).isEqualTo(SosStatus.PENDING);
         verify(sosService).createSos(eq(touristId), any(CreateSosRequest.class));
+    }
+
+    @Test
+    void createSos_withHeaderOnly_returnsCreated() {
+        UUID clientRequestId = UUID.randomUUID();
+        CreateSosRequest requestWithoutId = new CreateSosRequest(
+                new BigDecimal("12.9716"),
+                new BigDecimal("77.5946"),
+                null
+        );
+        SosResponse expectedResponse = new SosResponse(
+                UUID.randomUUID(), touristId, "tourist1", "Tourist One",
+                "+919876543210", new BigDecimal("12.9716"), new BigDecimal("77.5946"),
+                SosStatus.PENDING, null, clientRequestId, Instant.now()
+        );
+        when(sosService.createSos(eq(touristId), any(CreateSosRequest.class)))
+                .thenReturn(expectedResponse);
+
+        var result = sosController.createSos(authentication, clientRequestId.toString(), null, requestWithoutId);
+
+        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(result.getBody().data().clientRequestId()).isEqualTo(clientRequestId);
+    }
+
+    @Test
+    void createSos_withXHeaderOnly_returnsCreated() {
+        UUID clientRequestId = UUID.randomUUID();
+        CreateSosRequest requestWithoutId = new CreateSosRequest(
+                new BigDecimal("12.9716"),
+                new BigDecimal("77.5946"),
+                null
+        );
+        SosResponse expectedResponse = new SosResponse(
+                UUID.randomUUID(), touristId, "tourist1", "Tourist One",
+                "+919876543210", new BigDecimal("12.9716"), new BigDecimal("77.5946"),
+                SosStatus.PENDING, null, clientRequestId, Instant.now()
+        );
+        when(sosService.createSos(eq(touristId), any(CreateSosRequest.class)))
+                .thenReturn(expectedResponse);
+
+        var result = sosController.createSos(authentication, null, clientRequestId.toString(), requestWithoutId);
+
+        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(result.getBody().data().clientRequestId()).isEqualTo(clientRequestId);
+    }
+
+    @Test
+    void createSos_withMatchingHeaderAndBody_returnsCreated() {
+        UUID clientRequestId = UUID.randomUUID();
+        CreateSosRequest request = new CreateSosRequest(
+                new BigDecimal("12.9716"),
+                new BigDecimal("77.5946"),
+                clientRequestId
+        );
+        SosResponse expectedResponse = new SosResponse(
+                UUID.randomUUID(), touristId, "tourist1", "Tourist One",
+                "+919876543210", new BigDecimal("12.9716"), new BigDecimal("77.5946"),
+                SosStatus.PENDING, null, clientRequestId, Instant.now()
+        );
+        when(sosService.createSos(eq(touristId), any(CreateSosRequest.class)))
+                .thenReturn(expectedResponse);
+
+        var result = sosController.createSos(authentication, clientRequestId.toString(), null, request);
+
+        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(result.getBody().data().clientRequestId()).isEqualTo(clientRequestId);
+    }
+
+    @Test
+    void createSos_withMismatchingHeaderAndBody_throwsValidationException() {
+        UUID headerId = UUID.randomUUID();
+        UUID bodyId = UUID.randomUUID();
+        CreateSosRequest request = new CreateSosRequest(
+                new BigDecimal("12.9716"),
+                new BigDecimal("77.5946"),
+                bodyId
+        );
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                sosController.createSos(authentication, headerId.toString(), null, request))
+                .isInstanceOf(com.geoshield.common.exception.ValidationException.class)
+                .hasMessageContaining("must match");
+    }
+
+    @Test
+    void createSos_withInvalidHeaderUUID_throwsValidationException() {
+        CreateSosRequest request = new CreateSosRequest(
+                new BigDecimal("12.9716"),
+                new BigDecimal("77.5946"),
+                null
+        );
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                sosController.createSos(authentication, "not-a-valid-uuid", null, request))
+                .isInstanceOf(com.geoshield.common.exception.ValidationException.class)
+                .hasMessageContaining("Invalid UUID format");
+    }
+
+    @Test
+    void createSos_withNoKeyAtAll_throwsValidationException() {
+        CreateSosRequest request = new CreateSosRequest(
+                new BigDecimal("12.9716"),
+                new BigDecimal("77.5946"),
+                null
+        );
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                sosController.createSos(authentication, null, null, request))
+                .isInstanceOf(com.geoshield.common.exception.ValidationException.class)
+                .hasMessageContaining("clientRequestId or Idempotency-Key header is required");
     }
 
     @Test

@@ -1,6 +1,7 @@
 # Backend
 backend/target/
 backend/maven-target/
+backend/target-ide/
 backend/.mvn/
 
 # Offline geodata preprocessing tools (dev-only; not a build or runtime dependency)
