@@ -71,7 +71,29 @@ class RecentSafetyEventsCard extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeader(BuildContext context, String? resolvedArea) {
+  String _formatScopeBadge(String resolvedArea, String? resolutionLevel) {
+    if (resolutionLevel == 'LOCALITY') {
+      return 'Near $resolvedArea';
+    } else if (resolutionLevel == 'DISTRICT') {
+      return '$resolvedArea District';
+    } else if (resolutionLevel == 'STATE_UT') {
+      return '$resolvedArea (Regional)';
+    }
+    return resolvedArea;
+  }
+
+  String _formatScopeDescription(String resolvedArea, String? resolutionLevel) {
+    if (resolutionLevel == 'LOCALITY') {
+      return 'Local safety reports near $resolvedArea';
+    } else if (resolutionLevel == 'DISTRICT') {
+      return 'District safety reports for $resolvedArea';
+    } else if (resolutionLevel == 'STATE_UT') {
+      return 'Regional fallback for $resolvedArea (local news unavailable)';
+    }
+    return 'Reported in $resolvedArea';
+  }
+
+  Widget _buildHeader(BuildContext context, String? resolvedArea, [String? resolutionLevel]) {
     final theme = Theme.of(context);
     return Row(
       children: [
@@ -93,7 +115,7 @@ class RecentSafetyEventsCard extends ConsumerWidget {
               border: Border.all(color: Colors.blueGrey.shade200),
             ),
             child: Text(
-              resolvedArea,
+              _formatScopeBadge(resolvedArea, resolutionLevel),
               style: theme.textTheme.labelSmall?.copyWith(
                 color: Colors.blueGrey.shade800,
                 fontWeight: FontWeight.w600,
@@ -112,7 +134,7 @@ class RecentSafetyEventsCard extends ConsumerWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildHeader(context, response.resolvedArea),
+          _buildHeader(context, response.resolvedArea, response.resolutionLevel),
           const SizedBox(height: 8),
           Text(
             'Regional news feed currently unavailable.',
@@ -126,7 +148,7 @@ class RecentSafetyEventsCard extends ConsumerWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildHeader(context, response.resolvedArea),
+          _buildHeader(context, response.resolvedArea, response.resolutionLevel),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -143,9 +165,9 @@ class RecentSafetyEventsCard extends ConsumerWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Reported in ${response.resolvedArea} (Regional News Report)',
+            _formatScopeDescription(response.resolvedArea, response.resolutionLevel),
             style: theme.textTheme.labelSmall?.copyWith(
-              color: Colors.black45,
+              color: theme.colorScheme.onSurfaceVariant,
               fontStyle: FontStyle.italic,
             ),
           ),
@@ -156,12 +178,12 @@ class RecentSafetyEventsCard extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildHeader(context, response.resolvedArea),
+        _buildHeader(context, response.resolvedArea, response.resolutionLevel),
         const SizedBox(height: 4),
         Text(
-          'Reported in ${response.resolvedArea} (Regional News Report)',
+          _formatScopeDescription(response.resolvedArea, response.resolutionLevel),
           style: theme.textTheme.labelSmall?.copyWith(
-            color: Colors.black45,
+            color: theme.colorScheme.onSurfaceVariant,
             fontStyle: FontStyle.italic,
           ),
         ),
@@ -243,20 +265,24 @@ class RecentSafetyEventsCard extends ConsumerWidget {
                       Text(
                         '•  ${_formatRelativeTime(event.publishedAt)}',
                         style: theme.textTheme.labelSmall?.copyWith(
-                          color: Colors.black54,
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                       if (event.relatedSourcesCount > 1) ...[
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade200,
+                            color: theme.colorScheme.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
                             '+${event.relatedSourcesCount - 1} more',
-                            style: theme.textTheme.labelSmall?.copyWith(fontSize: 10),
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
                           ),
                         ),
                       ],

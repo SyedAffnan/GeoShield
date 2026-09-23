@@ -59,6 +59,27 @@ public class MockNewsProvider implements NewsProvider {
                 1
         ));
 
+        // Fixture 1b: Duplicate report of the rockfall / highway blockage from a second publisher
+        Instant time1b = now.minus(Duration.ofHours(2));
+        UUID id1b = UUID.nameUUIDFromBytes(("mock-1b-" + area).getBytes(StandardCharsets.UTF_8));
+        events.add(new RecentSafetyEventDto(
+                id1b,
+                "grp-mock-1b",
+                "[Test Fixture] Landslide halts traffic on " + area + " National Highway bypass",
+                "Severe rockfall and landslide on " + area + " National Highway bypass leaves vehicles stranded as clearing operations continue.",
+                "National Monitor",
+                "https://example.com/mock-news/landslide-" + areaSlug + "?utm_source=feed&ref=banner",
+                null,
+                time1b,
+                now,
+                SafetyEventCategory.NATURAL_DISASTER,
+                EventSeverity.HIGH,
+                RelevanceTier.HIGH,
+                area,
+                true,
+                1
+        ));
+
         // Fixture 2: Moderate relevance traffic accident
         Instant time2 = now.minus(Duration.ofHours(8));
         UUID id2 = UUID.nameUUIDFromBytes(("mock-2-" + area).getBytes(StandardCharsets.UTF_8));

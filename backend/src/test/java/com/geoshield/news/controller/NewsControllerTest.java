@@ -47,6 +47,7 @@ class NewsControllerTest {
                 new BigDecimal("77.1734"),
                 "Shimla",
                 "Shimla",
+                "Himachal Pradesh",
                 "NATURAL_DISASTER",
                 10
         );
@@ -62,7 +63,7 @@ class NewsControllerTest {
     @DisplayName("Returns 400 Bad Request when category string is invalid")
     void returnsBadRequestOnInvalidCategory() {
         ResponseEntity<NewsResponse> response = newsController.getRecentNews(
-                null, null, "Delhi", null, "INVALID_CATEGORY_NAME", 10
+                null, null, "Delhi", null, null, "INVALID_CATEGORY_NAME", 10
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -75,7 +76,7 @@ class NewsControllerTest {
         when(newsService.getRecentSafetyNews(any(NewsQuery.class))).thenReturn(mockResponse);
 
         ResponseEntity<NewsResponse> response = newsController.getRecentNews(
-                null, null, "Bengaluru", null, null, 10
+                null, null, "Bengaluru", null, null, null, 10
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);

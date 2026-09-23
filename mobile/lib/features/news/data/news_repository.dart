@@ -13,6 +13,7 @@ class NewsRepository {
     double? longitude,
     String? locality,
     String? district,
+    String? state,
     String? category,
     int? limit,
   }) async {
@@ -24,6 +25,9 @@ class NewsRepository {
     }
     if (district != null && district.trim().isNotEmpty) {
       queryParams['district'] = district.trim();
+    }
+    if (state != null && state.trim().isNotEmpty) {
+      queryParams['state'] = state.trim();
     }
     if (category != null && category.trim().isNotEmpty) {
       queryParams['category'] = category.trim();

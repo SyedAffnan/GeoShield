@@ -82,7 +82,7 @@ void main() {
         find.text('Regional news feed currently unavailable.'),
         findsOneWidget,
       );
-      expect(find.text('Shimla'), findsOneWidget);
+      expect(find.text('Near Shimla'), findsOneWidget);
     });
 
     testWidgets('Renders empty state when 0 events reported in area', (tester) async {
@@ -107,7 +107,7 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.text('Reported in Shimla (Regional News Report)'),
+        find.text('Local safety reports near Shimla'),
         findsOneWidget,
       );
     });
@@ -147,11 +147,12 @@ void main() {
 
       // Verify card content
       expect(find.text('Recent Safety News'), findsOneWidget);
+      expect(find.text('Solan District'), findsOneWidget);
       expect(find.text('Landslide clears near Solan bypass'), findsOneWidget);
       expect(find.text('Himachal Express'), findsOneWidget);
       expect(find.text('HIGH'), findsOneWidget);
       expect(find.text('+1 more'), findsOneWidget);
-      expect(find.text('Reported in Solan (Regional News Report)'), findsOneWidget);
+      expect(find.text('District safety reports for Solan'), findsOneWidget);
 
       // Tap on event tile to open details dialog
       await tester.tap(find.text('Landslide clears near Solan bypass'));

@@ -32,7 +32,7 @@ class GNewsProviderTest {
     void setUp() {
         NewsProperties properties = new NewsProperties(
                 true, "gnews", "test-api-key", "https://gnews.test/api/v4",
-                Duration.ofSeconds(2), Duration.ofSeconds(2), 45, 200, 72, 10, "en", "in"
+                Duration.ofSeconds(2), Duration.ofSeconds(2), 45, 200, 72, 10, "en", "in", 7
         );
 
         RestClient.Builder builder = RestClient.builder().baseUrl(properties.baseUrl());
@@ -102,7 +102,7 @@ class GNewsProviderTest {
     void returnsEmptyWhenNoApiKey() {
         NewsProperties unconfiguredProps = new NewsProperties(
                 true, "gnews", "", "https://gnews.test/api/v4",
-                Duration.ofSeconds(2), Duration.ofSeconds(2), 45, 200, 72, 10, "en", "in"
+                Duration.ofSeconds(2), Duration.ofSeconds(2), 45, 200, 72, 10, "en", "in", 7
         );
         GNewsProvider unconfiguredProvider = new GNewsProvider(
                 unconfiguredProps, RestClient.builder().build(), new EventClassifier(), new LocationRelevanceFilter()

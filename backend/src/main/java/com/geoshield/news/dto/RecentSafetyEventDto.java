@@ -22,4 +22,12 @@ public record RecentSafetyEventDto(
         String areaName,
         boolean isVerifiedSource,
         int relatedSourcesCount
-) {}
+) {
+    public RecentSafetyEventDto withRelevance(RelevanceTier newRelevance) {
+        return new RecentSafetyEventDto(
+                eventId, eventGroupId, title, description, sourceName, sourceUrl,
+                imageUrl, publishedAt, retrievedAt, category, severity,
+                newRelevance, areaName, isVerifiedSource, relatedSourcesCount
+        );
+    }
+}

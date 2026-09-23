@@ -72,4 +72,46 @@ class EventClassifierTest {
         EventSeverity sev = classifier.classifySeverity("Theft at tourist hotel", "Police arrested two suspects following investigation");
         assertThat(sev).isEqualTo(EventSeverity.MODERATE);
     }
+
+    @Test
+    @DisplayName("Regression: Murder investigation with body parts and Fire Force assistance classifies as CRIME_AND_VIOLENCE")
+    void murderWithFireForceAssistance_classifiesAsCrimeAndViolence() {
+        String title = "Murder investigation launched after body parts found in river";
+        String desc = "Police initiated a probe into the homicide. Fire Force assistance was requested to recover remains.";
+
+        SafetyEventCategory category = classifier.classifyCategory(title, desc);
+        assertThat(category).isEqualTo(SafetyEventCategory.CRIME_AND_VIOLENCE);
+        assertThat(category).isNotEqualTo(SafetyEventCategory.FIRE_AND_EXPLOSION);
+    }
+
+    @Test
+    @DisplayName("Regression: True fire story classifies as FIRE_AND_EXPLOSION")
+    void trueFireStory_classifiesAsFireAndExplosion() {
+        String title = "Fire broke out in a commercial building";
+        String desc = "Firefighters battled raging flames as smoke engulfed the complex.";
+
+        SafetyEventCategory category = classifier.classifyCategory(title, desc);
+        assertThat(category).isEqualTo(SafetyEventCategory.FIRE_AND_EXPLOSION);
+    }
+
+    @Test
+    @DisplayName("Regression: Fire department assisted police during murder investigation classifies as CRIME_AND_VIOLENCE")
+    void fireDepartmentAssistedPolice_doesNotOverrideMurderSubject() {
+        String title = "Fire department assisted police during murder investigation";
+        String desc = "Divers recovered evidence linked to the killing of a local merchant.";
+
+        SafetyEventCategory category = classifier.classifyCategory(title, desc);
+        assertThat(category).isEqualTo(SafetyEventCategory.CRIME_AND_VIOLENCE);
+        assertThat(category).isNotEqualTo(SafetyEventCategory.FIRE_AND_EXPLOSION);
+    }
+
+    @Test
+    @DisplayName("Regression: Agency name alone does not trigger false disaster or fire category")
+    void agencyNameAlone_doesNotTriggerDisasterCategory() {
+        String title = "Disaster Management Authority conducts routine meeting with Fire Service";
+        String desc = "Officials held annual administrative review of budget allocations.";
+
+        SafetyEventCategory category = classifier.classifyCategory(title, desc);
+        assertThat(category).isEqualTo(SafetyEventCategory.GENERAL_SAFETY);
+    }
 }

@@ -19,8 +19,10 @@ public record NewsProperties(
         int lookbackHours,
         int maxResults,
         String language,
-        String country
+        String country,
+        int maxAgeDays
 ) {
+
     public NewsProperties {
         if (provider == null || provider.isBlank()) {
             provider = (apiKey != null && !apiKey.isBlank()) ? "gnews" : "mock";
@@ -51,6 +53,9 @@ public record NewsProperties(
         }
         if (country == null || country.isBlank()) {
             country = "in";
+        }
+        if (maxAgeDays <= 0) {
+            maxAgeDays = 7;
         }
     }
 }

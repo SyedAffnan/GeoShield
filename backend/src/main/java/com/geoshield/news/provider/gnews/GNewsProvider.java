@@ -97,7 +97,8 @@ public class GNewsProvider implements NewsProvider {
         }
 
         String queryTerms = buildQueryKeywords(area, query.category());
-        Instant fromTime = Instant.now().minus(Duration.ofHours(properties.lookbackHours()));
+        Instant now = Instant.now();
+        Instant fromTime = now.minus(Duration.ofDays(properties.maxAgeDays()));
 
         try {
             String uriString = String.format(
@@ -123,7 +124,7 @@ public class GNewsProvider implements NewsProvider {
                 return List.of();
             }
 
-            return mapArticles(response.articles(), area, query.category());
+            return mapArticles(response.articles(), area, query);
 
         } catch (RestClientException e) {
             log.warn("GNews request failed for area '{}': {}", area, e.getMessage());
@@ -161,23 +162,52 @@ public class GNewsProvider implements NewsProvider {
         return "\"" + cleanArea + "\" AND " + safetyTerms;
     }
 
-    private List<RecentSafetyEventDto> mapArticles(List<GNewsRawResponse.GNewsArticle> articles, String area, SafetyEventCategory requestedCategory) {
+    private List<RecentSafetyEventDto> mapArticles(List<GNewsRawResponse.GNewsArticle> articles, String area, NewsQuery query) {
         List<RecentSafetyEventDto> dtos = new ArrayList<>();
         Instant now = Instant.now();
+        Instant oldestAllowed = now.minus(Duration.ofDays(properties.maxAgeDays()));
+        SafetyEventCategory requestedCategory = query.category();
 
         for (GNewsRawResponse.GNewsArticle art : articles) {
             if (art.title() == null || art.title().isBlank()) {
                 continue;
             }
 
+            // Publication timestamp: unusable timestamp is rejected safely
+            Instant publishedAt = parseTimestamp(art.publishedAt());
+            if (publishedAt == null) {
+                log.debug("Dropped article '{}' due to missing or unusable publication timestamp", art.title());
+                continue;
+            }
+
+            // Exact duration freshness check
+            if (publishedAt.isBefore(oldestAllowed) || publishedAt.isAfter(now.plus(Duration.ofMinutes(15)))) {
+                log.debug("Dropped article '{}' published at {} failing freshness window ({} days)",
+                        art.title(), publishedAt, properties.maxAgeDays());
+                continue;
+            }
+
             String cleanTitle = relevanceFilter.sanitizeText(art.title());
             String cleanDesc = relevanceFilter.sanitizeText(art.description());
 
-            // Location relevance check
-            RelevanceTier relevance = relevanceFilter.calculateRelevance(area, cleanTitle, cleanDesc);
-            if (!relevanceFilter.isAcceptableRelevance(relevance)) {
-                log.debug("Dropped article '{}' due to insufficient relevance ({}) for area '{}'", cleanTitle, relevance, area);
-                continue;
+            // Location relevance check with hierarchical context and conflict detection
+            RelevanceTier relevance;
+            if (query.resolutionLevel() != null && !query.resolutionLevel().isBlank()) {
+                relevance = relevanceFilter.calculateHierarchicalRelevance(
+                        query.locality(), query.district(), query.stateUt(), cleanTitle, cleanDesc
+                );
+                if (!relevanceFilter.isAcceptableForLevel(query.resolutionLevel(), relevance)) {
+                    log.debug("Dropped article '{}' due to insufficient relevance ({}) for level '{}'",
+                            cleanTitle, relevance, query.resolutionLevel());
+                    continue;
+                }
+            } else {
+                relevance = relevanceFilter.calculateRelevance(area, cleanTitle, cleanDesc);
+                if (!relevanceFilter.isAcceptableRelevance(relevance)) {
+                    log.debug("Dropped article '{}' due to insufficient relevance ({}) for area '{}'",
+                            cleanTitle, relevance, area);
+                    continue;
+                }
             }
 
             // Categorization
@@ -187,9 +217,6 @@ public class GNewsProvider implements NewsProvider {
 
             // Conservative severity
             EventSeverity severity = eventClassifier.classifySeverity(cleanTitle, cleanDesc);
-
-            // Publication timestamp
-            Instant publishedAt = parseTimestamp(art.publishedAt(), now);
 
             // Deterministic UUID based on URL and publish time
             String sourceUrl = (art.url() != null && art.url().startsWith("https://")) ? art.url() : "https://news.google.com";
@@ -221,14 +248,14 @@ public class GNewsProvider implements NewsProvider {
         return dtos;
     }
 
-    private Instant parseTimestamp(String raw, Instant fallback) {
+    private Instant parseTimestamp(String raw) {
         if (raw == null || raw.isBlank()) {
-            return fallback;
+            return null;
         }
         try {
             return Instant.parse(raw);
         } catch (Exception e) {
-            return fallback;
+            return null;
         }
     }
 }

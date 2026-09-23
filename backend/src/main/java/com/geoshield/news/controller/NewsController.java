@@ -66,6 +66,10 @@ public class NewsController {
             String district,
 
             @RequestParam(required = false)
+            @Size(max = 60, message = "State name must be <= 60 characters")
+            String state,
+
+            @RequestParam(required = false)
             String category,
 
             @RequestParam(required = false, defaultValue = "10")
@@ -88,6 +92,7 @@ public class NewsController {
                 longitude,
                 locality,
                 district,
+                state,
                 null,
                 null,
                 parsedCategory,

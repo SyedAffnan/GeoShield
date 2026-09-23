@@ -74,6 +74,7 @@ geoshield:
     max-results: ${GEOSHIELD_NEWS_MAX_RESULTS:10}
     language: ${GEOSHIELD_NEWS_LANGUAGE:en}
     country: ${GEOSHIELD_NEWS_COUNTRY:in}
+    max-age-days: ${GEOSHIELD_NEWS_MAX_AGE_DAYS:7}
   advisory:
     historical-trend:
       enabled: ${GEOSHIELD_HISTORICAL_ADVISORY_ENABLED:true}

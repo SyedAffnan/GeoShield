@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/providers.dart';
 import '../../../core/location/device_location_service.dart';
+import '../../../core/location/native_geocoder.dart';
 import '../data/news_repository.dart';
 import '../data/recent_safety_event_model.dart';
 
@@ -21,14 +22,27 @@ final recentNewsProvider =
 
   double? lat;
   double? lon;
+  String? locality;
+  String? district;
+  String? state;
   if (fixResult is DeviceLocationFix) {
     lat = fixResult.latitude;
     lon = fixResult.longitude;
+
+    final geocoded = await NativeGeocoder.reverseGeocode(lat, lon);
+    if (geocoded != null) {
+      locality = geocoded.bestLocality;
+      district = geocoded.district;
+      state = geocoded.state;
+    }
   }
 
   return repository.fetchRecentSafetyNews(
     latitude: lat,
     longitude: lon,
+    locality: locality,
+    district: district,
+    state: state,
     limit: 10,
   );
 });
