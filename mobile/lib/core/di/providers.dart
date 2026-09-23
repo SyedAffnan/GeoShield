@@ -4,12 +4,14 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/admin/data/admin_repository.dart';
+import '../../features/admin/data/admin_sachet_repository.dart';
 import '../../features/auth/data/auth_repository.dart';
 import '../../features/incidents/data/incident_repository.dart';
 import '../../features/location/data/location_repository.dart';
 import '../../features/responder/data/responder_repository.dart';
 import '../../features/risk/data/historical_advisory_model.dart';
 import '../../features/risk/data/risk_repository.dart';
+import '../../features/risk/data/sachet_alert_model.dart';
 import '../../features/sos/data/sos_outbox_store.dart';
 import '../../features/sos/data/sos_repository.dart';
 import '../geofencing/presentation/geofence_controller.dart';
@@ -226,6 +228,15 @@ final incidentsProvider = FutureProvider.autoDispose<List<Incident>>((ref) {
 
 final adminRepositoryProvider = Provider<AdminRepository>((ref) {
   return AdminRepository(ref.watch(apiClientProvider));
+});
+
+final adminSachetRepositoryProvider = Provider<AdminSachetRepository>((ref) {
+  return AdminSachetRepository(ref.watch(apiClientProvider));
+});
+
+final adminActiveSachetAlertsProvider =
+    FutureProvider.autoDispose<List<SachetAlertModel>>((ref) async {
+  return ref.watch(adminSachetRepositoryProvider).fetchActiveAlerts();
 });
 
 final responderRepositoryProvider = Provider<ResponderRepository>((ref) {

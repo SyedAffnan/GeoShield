@@ -17,6 +17,8 @@ class SachetAlertModel {
     this.instruction,
     this.areaDesc,
     required this.isSynthetic,
+    this.status,
+    this.msgType,
   });
 
   final String id;
@@ -35,6 +37,8 @@ class SachetAlertModel {
   final String? instruction;
   final String? areaDesc;
   final bool isSynthetic;
+  final String? status;
+  final String? msgType;
 
   factory SachetAlertModel.fromJson(Map<String, dynamic> json) {
     return SachetAlertModel(
@@ -60,6 +64,8 @@ class SachetAlertModel {
       instruction: json['instruction'] as String?,
       areaDesc: json['areaDesc'] as String?,
       isSynthetic: json['isSynthetic'] as bool? ?? false,
+      status: json['status'] as String?,
+      msgType: json['msgType'] as String?,
     );
   }
 }

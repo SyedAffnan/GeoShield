@@ -167,6 +167,13 @@ class AdminDashboardScreen extends ConsumerWidget {
                   subtitle: 'System-wide tourist safety reports',
                   onTap: () => context.push('/admin/incidents'),
                 ),
+                const SizedBox(height: 8),
+                _ActionTile(
+                  icon: Icons.campaign_outlined,
+                  title: 'SACHET Alerts',
+                  subtitle: 'Manage NDMA disaster alerts and high-priority overrides',
+                  onTap: () => context.push('/admin/sachet'),
+                ),
               ],
             ),
           ),

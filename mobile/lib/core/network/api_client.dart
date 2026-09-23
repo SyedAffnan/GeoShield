@@ -128,6 +128,28 @@ class GeoShieldApiClient implements ApiClient {
     }
   }
 
+  Future<Map<String, dynamic>> postRaw(
+    String path, {
+    required String data,
+    String contentType = 'application/xml',
+    Map<String, dynamic>? headers,
+  }) async {
+    try {
+      final requestHeaders = <String, dynamic>{
+        'Content-Type': contentType,
+        ...?headers,
+      };
+      final response = await dio.post<dynamic>(
+        path,
+        data: data,
+        options: Options(headers: requestHeaders),
+      );
+      return _mapData(response.data);
+    } on DioException catch (error) {
+      throw _toException(error);
+    }
+  }
+
   Future<List<dynamic>> getListData(String path) async {
     try {
       final response = await dio.get<dynamic>(path);

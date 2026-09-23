@@ -4,6 +4,8 @@ import '../../features/admin/presentation/admin_dashboard_screen.dart';
 import '../../features/admin/presentation/admin_incidents_screen.dart';
 import '../../features/admin/presentation/admin_provision_user_screen.dart';
 import '../../features/admin/presentation/admin_users_screen.dart';
+import '../../features/admin/presentation/sachet/admin_create_sachet_alert_screen.dart';
+import '../../features/admin/presentation/sachet/admin_sachet_alerts_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
 import '../../features/auth/presentation/session_gate.dart';
@@ -40,6 +42,12 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
         path: '/admin/incidents',
         builder: (_, __) => const AdminIncidentsScreen()),
+    GoRoute(
+        path: '/admin/sachet',
+        builder: (_, __) => const AdminSachetAlertsScreen()),
+    GoRoute(
+        path: '/admin/sachet/create',
+        builder: (_, __) => const AdminCreateSachetAlertScreen()),
     GoRoute(
         path: '/responder',
         builder: (_, __) => const ResponderDashboardScreen()),

@@ -3,8 +3,14 @@ package com.geoshield.notification.service;
 import com.geoshield.notification.entity.SachetAlert;
 import java.io.StringReader;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.TemporalAccessor;
+import java.time.temporal.TemporalQueries;
 import java.util.ArrayList;
 import java.util.List;
 import javax.xml.XMLConstants;
@@ -289,14 +295,39 @@ public class SachetCapXmlParser {
         return elements;
     }
 
-    private Instant parseTimestamp(String text) {
+    private static final DateTimeFormatter CAP_DATE_TIME_FORMATTER = new DateTimeFormatterBuilder()
+            .append(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+            .optionalStart()
+            .appendOffset("+HH:MM", "Z")
+            .optionalEnd()
+            .optionalStart()
+            .appendOffset("+HHMM", "Z")
+            .optionalEnd()
+            .optionalStart()
+            .appendOffset("+HH", "Z")
+            .optionalEnd()
+            .toFormatter();
+
+    Instant parseTimestamp(String text) {
+        if (text == null || text.isBlank()) {
+            throw new IllegalArgumentException("CAP timestamp must not be null or empty");
+        }
+        String trimmed = text.trim();
         try {
-            return OffsetDateTime.parse(text).toInstant();
-        } catch (DateTimeParseException e1) {
+            TemporalAccessor parsed = CAP_DATE_TIME_FORMATTER.parse(trimmed);
+            ZoneOffset offset = parsed.query(TemporalQueries.offset());
+            if (offset == null) {
+                throw new IllegalArgumentException(
+                        "Invalid CAP 1.2 ISO-8601 timestamp: '" + text + "'. Timestamps must include an explicit timezone offset (e.g. +05:30 or Z). Local timestamps without timezone are disallowed.");
+            }
+            LocalDateTime ldt = LocalDateTime.from(parsed);
+            return ldt.toInstant(offset);
+        } catch (DateTimeParseException e) {
             try {
-                return Instant.parse(text);
+                return Instant.parse(trimmed);
             } catch (DateTimeParseException e2) {
-                throw new IllegalArgumentException("Invalid ISO 8601 timestamp: " + text);
+                throw new IllegalArgumentException(
+                        "Invalid CAP 1.2 ISO-8601 timestamp: '" + text + "'. Timestamps must include an explicit timezone offset (e.g. +05:30 or Z). Local timestamps without timezone are disallowed.", e);
             }
         }
     }
